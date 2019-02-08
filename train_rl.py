@@ -69,7 +69,7 @@ def train_model():
     # Prepare trainer
     trainer = ReinforcementTrainer(opt, algo)
     # Start training
-    trainer.train()
+    trainer.train(acmodel)
 
 
 def init_argparser():
