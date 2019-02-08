@@ -3,3 +3,4 @@
 *.swp
 machine/tasks/*/data/
 machine/tasks/LongLookupTables/*/data/
+models/
