@@ -1,16 +1,14 @@
-import os
 import argparse
-import logging
 import datetime
+import logging
+import os
 import time
 
-import torch
 import gym
-
-from machine.trainer import ReinforcementTrainer
+import torch
 
 import babyai
-
+from machine.trainer import ReinforcementTrainer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -25,8 +23,6 @@ def train_model():
     opt = parser.parse_args()
     opt = validate_options(parser, opt)
 
-    num_updates = int(opt.num_env_steps) // opt.num_steps // opt.num_processes
-
     # Prepare logging and environment
     init_logging(opt)
     envs = []
@@ -35,6 +31,7 @@ def train_model():
         env.seed(100 * opt.seed + i)
         envs.append(env)
 
+    # Create model name
     suffix = datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")
     instr = opt.instr_arch if opt.instr_arch else "noinstr"
     mem = "mem" if not opt.no_mem else "nomem"
@@ -50,7 +47,6 @@ def train_model():
     default_model_name = "{env}_{arch}_{instr}_{mem}_seed{seed}{info}{coef}_{suffix}".format(**model_name_parts)
     opt.model = opt.model.format(**model_name_parts) if opt.model else default_model_name
 
-
     # Prepare model
     obss_preprocessor = babyai.utils.ObssPreprocessor(opt.model, envs[0].observation_space, None)
     acmodel = babyai.model.ACModel(obss_preprocessor.obs_space, envs[0].action_space,
@@ -62,6 +58,7 @@ def train_model():
     if torch.cuda.is_available():
         acmodel.cuda()
 
+    # Prepare training algorithm
     reshape_reward = lambda _0, _1, reward, _2: opt.reward_scale * reward
     algo = babyai.rl.PPOAlgo(envs, acmodel, opt.frames_per_proc, opt.gamma, opt.lr, opt.beta1, opt.beta2,
                             opt.gae_lambda,
@@ -69,53 +66,11 @@ def train_model():
                             opt.optim_eps, opt.clip_eps, opt.ppo_epochs, opt.num_mini_batch, obss_preprocessor,
                             reshape_reward)
 
-    status = {'i': 0,
-            'num_episodes': 0,
-            'num_frames': 0}
-    header = (["update", "episodes", "frames", "FPS", "duration"]
-          + ["return_" + stat for stat in ['mean', 'std', 'min', 'max']]
-          + ["success_rate"]
-          + ["num_frames_" + stat for stat in ['mean', 'std', 'min', 'max']]
-          + ["entropy", "value", "policy_loss", "value_loss", "loss", "grad_norm"])
+    # Prepare trainer
+    trainer = ReinforcementTrainer(opt, algo)
+    # Start training
+    trainer.train()
 
-
-    # Train model
-    total_start_time = time.time()
-    best_success_rate = 0
-    test_env_name = opt.env_name
-    while status['num_frames'] < opt.frames:
-        # Update parameters
-        update_start_time = time.time()
-        logs = algo.update_parameters()
-        update_end_time = time.time()
-
-        status['num_frames'] += logs["num_frames"]
-        status['num_episodes'] += logs['episodes_done']
-        status['i'] += 1
-
-        # Print logs
-        if status['i'] % opt.print_every == 0:
-            total_ellapsed_time = int(time.time() - total_start_time)
-            fps = logs["num_frames"] / (update_end_time - update_start_time)
-            duration = datetime.timedelta(seconds=total_ellapsed_time)
-            return_per_episode = babyai.utils.synthesize(logs["return_per_episode"])
-            success_per_episode = babyai.utils.synthesize(
-                [1 if r > 0 else 0 for r in logs["return_per_episode"]])
-            num_frames_per_episode = babyai.utils.synthesize(logs["num_frames_per_episode"])
-
-            data = [status['i'], status['num_episodes'], status['num_frames'],
-                    fps, total_ellapsed_time,
-                    *return_per_episode.values(),
-                    success_per_episode['mean'],
-                    *num_frames_per_episode.values(),
-                    logs["entropy"], logs["value"], logs["policy_loss"], logs["value_loss"],
-                    logs["loss"], logs["grad_norm"]]
-
-            format_str = ("U {} | E {} | F {:06} | FPS {:04.0f} | D {} | R:xsmM {: .2f} {: .2f} {: .2f} {: .2f} | "
-                        "S {:.2f} | F:xsmM {:.1f} {:.1f} {} {} | H {:.3f} | V {:.3f} | "
-                        "pL {: .3f} | vL {:.3f} | L {:.3f} | gN {:.3f} | ")
-
-            logging.info(format_str.format(*data))
 
 def init_argparser():
     parser = argparse.ArgumentParser()
@@ -234,128 +189,6 @@ def init_logging(opt):
     logging.basicConfig(format=LOG_FORMAT, level=getattr(
         logging, opt.log_level.upper()))
     logging.info(opt)
-
-
-def prepare_environment(opt):
-    src = SourceField()
-    tgt = TargetField(include_eos=use_output_eos)
-    tabular_data_fields = [('src', src), ('tgt', tgt)]
-
-    max_len = opt.max_len
-
-    def len_filter(example):
-        return len(example.src) <= max_len and len(example.tgt) <= max_len
-
-    # generate training and testing data
-    train = torchtext.data.TabularDataset(
-        path=opt.train, format='tsv',
-        fields=tabular_data_fields,
-        filter_pred=len_filter
-    )
-
-    if opt.dev:
-        dev = torchtext.data.TabularDataset(
-            path=opt.dev, format='tsv',
-            fields=tabular_data_fields,
-            filter_pred=len_filter
-        )
-
-    else:
-        dev = None
-
-    monitor_data = OrderedDict()
-    for dataset in opt.monitor:
-        m = torchtext.data.TabularDataset(
-            path=dataset, format='tsv',
-            fields=tabular_data_fields,
-            filter_pred=len_filter)
-        monitor_data[dataset] = m
-
-    return src, tgt, train, dev, monitor_data
-
-
-def load_model_from_checkpoint(opt):
-    logging.info("loading checkpoint from {}".format(
-        os.path.join(opt.output_dir, opt.load_checkpoint)))
-
-    return None
-
-
-def initialize_model(opt):
-    # build vocabulary
-    src.build_vocab(train, max_size=opt.src_vocab)
-    tgt.build_vocab(train, max_size=opt.tgt_vocab)
-    input_vocab = src.vocab
-    output_vocab = tgt.vocab
-
-    # Initialize model
-    hidden_size = opt.hidden_size
-    decoder_hidden_size = hidden_size * 2 if opt.bidirectional else hidden_size
-    encoder = EncoderRNN(len(src.vocab), opt.max_len, hidden_size, opt.embedding_size,
-                         dropout_p=opt.dropout_p_encoder,
-                         n_layers=opt.n_layers,
-                         bidirectional=opt.bidirectional,
-                         rnn_cell=opt.rnn_cell,
-                         variable_lengths=True)
-    decoder = DecoderRNN(len(tgt.vocab), opt.max_len, decoder_hidden_size,
-                         dropout_p=opt.dropout_p_decoder,
-                         n_layers=opt.n_layers,
-                         attention_method=opt.attention_method,
-                         full_focus=opt.full_focus,
-                         bidirectional=opt.bidirectional,
-                         rnn_cell=opt.rnn_cell,
-                         eos_id=tgt.eos_id, sos_id=tgt.sos_id)
-    seq2seq = Seq2seq(encoder, decoder)
-    seq2seq.to(device)
-
-    return seq2seq, input_vocab, output_vocab
-
-
-def prepare_losses_and_metrics(
-        opt, pad, unk, sos, eos, input_vocab, output_vocab):
-    use_output_eos = not opt.ignore_output_eos
-
-    # Prepare loss and metrics
-    losses = [NLLLoss(ignore_index=pad)]
-    loss_weights = [1.]
-
-    for loss in losses:
-        loss.to(device)
-
-    metrics = []
-
-    if 'word_acc' in opt.metrics:
-        metrics.append(WordAccuracy(ignore_index=pad))
-    if 'seq_acc' in opt.metrics:
-        metrics.append(SequenceAccuracy(ignore_index=pad))
-    if 'target_acc' in opt.metrics:
-        metrics.append(FinalTargetAccuracy(ignore_index=pad, eos_id=eos))
-    if 'sym_rwr_acc' in opt.metrics:
-        metrics.append(SymbolRewritingAccuracy(
-            input_vocab=input_vocab,
-            output_vocab=output_vocab,
-            use_output_eos=use_output_eos,
-            output_sos_symbol=sos,
-            output_pad_symbol=pad,
-            output_eos_symbol=eos,
-            output_unk_symbol=unk))
-    if 'bleu' in opt.metrics:
-        metrics.append(BLEU(
-            input_vocab=input_vocab,
-            output_vocab=output_vocab,
-            use_output_eos=use_output_eos,
-            output_sos_symbol=sos,
-            output_pad_symbol=pad,
-            output_eos_symbol=eos,
-            output_unk_symbol=unk))
-
-    return losses, loss_weights, metrics
-
-
-def create_trainer(opt, losses, loss_weights, metrics):
-    return SupervisedTrainer(loss=losses, metrics=metrics, loss_weights=loss_weights, batch_size=opt.batch_size,
-                             eval_batch_size=opt.eval_batch_size, checkpoint_every=opt.save_every,
-                             print_every=opt.print_every, expt_dir=opt.output_dir)
 
 
 if __name__ == "__main__":
