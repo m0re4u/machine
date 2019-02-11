@@ -14,7 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # CONSTANTS
 IGNORE_INDEX = -1
-LOG_FORMAT = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+LOG_FORMAT = '%(asctime)s %(name)-6s %(levelname)-6s %(message)s'
 
 
 def train_model():
@@ -44,40 +44,37 @@ def train_model():
         'info': '',
         'coef': '',
         'suffix': suffix}
-    default_model_name = "{env}_{arch}_{instr}_{mem}_seed{seed}{info}{coef}_{suffix}".format(**model_name_parts)
-    opt.model = opt.model.format(**model_name_parts) if opt.model else default_model_name
+    model_name = "{env}_{arch}_{instr}_{mem}_seed{seed}{info}{coef}_{suffix}".format(
+        **model_name_parts)
 
     # Prepare model
-    obss_preprocessor = babyai.utils.ObssPreprocessor(opt.model, envs[0].observation_space, None)
+    obss_preprocessor = babyai.utils.ObssPreprocessor(
+        model_name, envs[0].observation_space, None)
     acmodel = babyai.model.ACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                          opt.image_dim, opt.memory_dim, opt.instr_dim,
-                          not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+                                   opt.image_dim, opt.memory_dim, opt.instr_dim,
+                                   not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
 
     obss_preprocessor.vocab.save()
 
     if torch.cuda.is_available():
         acmodel.cuda()
 
-    # Prepare training algorithm
-    reshape_reward = lambda _0, _1, reward, _2: opt.reward_scale * reward
-    algo = babyai.rl.PPOAlgo(envs, acmodel, opt.frames_per_proc, opt.gamma, opt.lr, opt.beta1, opt.beta2,
-                            opt.gae_lambda,
-                            opt.entropy_coef, opt.value_loss_coef, opt.max_grad_norm, opt.recurrence,
-                            opt.optim_eps, opt.clip_eps, opt.ppo_epochs, opt.num_mini_batch, obss_preprocessor,
-                            reshape_reward)
-
+    def reshape_reward(_0, _1, reward, _2): return opt.reward_scale * reward
     # Prepare trainer
-    trainer = ReinforcementTrainer(opt, algo)
+    from babyai.rl.utils import ParallelEnv
+    trainer = ReinforcementTrainer(ParallelEnv(
+        envs), opt, acmodel, obss_preprocessor, reshape_reward, 'ppo')
+
     # Start training
-    trainer.train(acmodel)
+    trainer.train()
 
 
 def init_argparser():
     parser = argparse.ArgumentParser()
 
-    # Model arguments
-    parser.add_argument('--env-name', help='')
-    parser.add_argument('--model', help='', default=None)
+    # Training algorithm arguments
+    parser.add_argument('--env-name',
+                        help='Name of the environment to use')
     parser.add_argument('--use-gae', action='store_true', default=False,
                         help='use generalized advantage estimation')
     parser.add_argument('--gae-lambda', type=float, default=0.95,
@@ -92,7 +89,7 @@ def init_argparser():
                         help='how many training CPU processes to use (default: 16)')
     parser.add_argument('--num-steps', type=int, default=5,
                         help='number of forward steps in A2C (default: 5)')
-    parser.add_argument('--num-mini-batch', type=int, default=1280,
+    parser.add_argument('--batch_size', type=int, default=1280,
                         help='number of batches for ppo (default: 1280)')
     parser.add_argument('--use-linear-lr-decay', action='store_true', default=False,
                         help='use a linear schedule on the learning rate')
@@ -109,30 +106,21 @@ def init_argparser():
     parser.add_argument('--num-env-steps', type=int, default=10e6,
                         help='number of environment steps to train (default: 10e6)')
     parser.add_argument("--frames-per-proc", type=int, default=40,
-                            help="number of frames per process before update (default: 40)")
+                        help="number of frames per process before update (default: 40)")
     parser.add_argument("--optim-eps", type=float, default=1e-5,
-                            help="Adam and RMSprop optimizer epsilon (default: 1e-5)")
+                        help="Adam and RMSprop optimizer epsilon (default: 1e-5)")
     parser.add_argument("--reward-scale", type=float, default=20.,
-                    help="Reward scale multiplier")
+                        help="Reward scale multiplier")
     parser.add_argument("--recurrence", type=int, default=20,
                         help="number of timesteps gradient is backpropagated (default: 20)")
     parser.add_argument("--clip-eps", type=float, default=0.2,
-                    help="clipping epsilon for PPO (default: 0.2)")
+                        help="clipping epsilon for PPO (default: 0.2)")
     parser.add_argument("--frames", type=int, default=int(9e10),
                         help="number of frames of training (default: 9e10)")
-
-
-
     parser.add_argument("--beta1", type=float, default=0.9,
-                            help="beta1 for Adam (default: 0.9)")
+                        help="beta1 for Adam (default: 0.9)")
     parser.add_argument("--beta2", type=float, default=0.999,
-                            help="beta2 for Adam (default: 0.999)")
-
-
-    parser.add_argument('--monitor', nargs='+', default=[],
-                        help='Data to monitor during training')
-    parser.add_argument('--output_dir', default='../models',
-                        help='Path to model directory. If load_checkpoint is True, then path to checkpoint directory has to be provided')
+                        help="beta2 for Adam (default: 0.999)")
     parser.add_argument('--ppo-epochs', type=int,
                         help='Number of epochs', default=6)
 
@@ -152,17 +140,21 @@ def init_argparser():
     parser.add_argument("--arch", default='expert_filmcnn',
                         help="image embedding architecture")
 
-    # Data management
+    # Logging and model saving
     parser.add_argument('--load_checkpoint',
                         help='The name of the checkpoint to load, usually an encoded time string')
+    parser.add_argument('--resume',
+                        help='Indicates if training has to be resumed from the latest checkpoint', action='store_true',)
     parser.add_argument('--save_every', type=int,
                         help='Every how many batches the model should be saved', default=100)
     parser.add_argument('--print_every', type=int,
                         help='Every how many batches to print results', default=100)
-    parser.add_argument('--resume', action='store_true',
-                        help='Indicates if training has to be resumed from the latest checkpoint')
-    parser.add_argument('--log-level', default='info', help='Logging level.')
-    parser.add_argument('--write-logs', help='Specify file to write logs to after training')
+    parser.add_argument('--output_dir', default='../models',
+                        help='Path to model directory. If load_checkpoint is True, then path to checkpoint directory has to be provided')
+    parser.add_argument('--log-level',
+                        help='Logging level.', default='info')
+    parser.add_argument('--write-logs',
+                        help='Specify file to write logs to after training')
     parser.add_argument('--cuda_device', default=0,
                         type=int, help='set cuda device to use')
 
@@ -180,7 +172,6 @@ def validate_options(parser, opt):
 
     torch.manual_seed(opt.seed)
     torch.cuda.manual_seed_all(opt.seed)
-
 
     return opt
 
