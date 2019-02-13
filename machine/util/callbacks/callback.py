@@ -6,10 +6,10 @@ class Callback(object):
     Inspired by keras' callbacks.
     A callback is a set of functions to be applied at given stages
     of the training procedure. You can use callbacks to get a view
-    on internal states and statistics of the model during training. 
+    on internal states and statistics of the model during training.
     You can pass a list of callbacks (as the keyword argument callbacks)
-    to the train() method of the SupervisedTrainer. 
-    The relevant methods of the callbacks will then be called at each 
+    to the train() method of the SupervisedTrainer.
+    The relevant methods of the callbacks will then be called at each
     stage of the training.
     """
 
@@ -39,7 +39,7 @@ class Callback(object):
         If self.info['print'] = True:
             Then self.info['monitor_losses'] and self.info['monitor_metrics']
             should be available to use here.
-        If self.info['checkpoint'] = True:, 
+        If self.info['checkpoint'] = True:
             Then self.info['eval_losses'] and self.info['eval_metrics']
             should be available to use here.
         """

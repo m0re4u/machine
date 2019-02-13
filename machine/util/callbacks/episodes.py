@@ -5,6 +5,7 @@ import os
 import numpy as np
 
 from machine.util.callbacks import Callback
+from tensorboardX import SummaryWriter
 
 
 class EpisodeLogger(Callback):
@@ -18,10 +19,15 @@ class EpisodeLogger(Callback):
         batch: step
     """
 
-    def __init__(self):
+    def __init__(self, use_tensorboard=False):
         super(EpisodeLogger, self).__init__()
 
         self.logger = logging.getLogger("EpisodeLogger")
+        if use_tensorboard:
+            self.logger.info("Using Tensorboard")
+            self.writer = SummaryWriter('runs')
+        else:
+            self.writer = None
 
     def set_trainer(self, trainer):
         self.trainer = trainer
@@ -75,6 +81,9 @@ class EpisodeLogger(Callback):
                       "pL {: .3f} | vL {:.3f} | L {:.3f} | gN {:.3f} | ")
 
         self.logger.info(format_str.format(*data))
+        if self.writer is not None:
+            self.writer.add_scalar('train/fps', fps, status['i'])
+            self.writer.add_scalar('train/succes', success_per_episode['mean'], status['i'])
 
 
 def get_stats(arr):

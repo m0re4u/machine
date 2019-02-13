@@ -141,6 +141,8 @@ def init_argparser():
                         help="image embedding architecture")
 
     # Logging and model saving
+    parser.add_argument('--tb',
+                        help='Run tensorboard', action='store_true',)
     parser.add_argument('--load_checkpoint',
                         help='The name of the checkpoint to load, usually an encoded time string')
     parser.add_argument('--resume',

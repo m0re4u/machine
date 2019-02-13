@@ -52,10 +52,8 @@ class ReinforcementTrainer(object):
         self.obs = self.env.reset()
         self.obss = [None]*(shape[0])
 
-        self.memory = torch.zeros(
-            shape[1], self.model.memory_size, device=device)
-        self.memories = torch.zeros(
-            *shape, self.model.memory_size, device=device)
+        self.memory = torch.zeros(shape[1], self.model.memory_size, device=device)
+        self.memories = torch.zeros(*shape, self.model.memory_size, device=device)
 
         self.mask = torch.ones(shape[1], device=device)
         self.masks = torch.zeros(*shape, device=device)
@@ -72,7 +70,7 @@ class ReinforcementTrainer(object):
         self.log_episode_num_frames = torch.zeros(
             self.num_procs, device=device)
 
-        self.callback = EpisodeLogger()
+        self.callback = EpisodeLogger(opt.tb)
 
         self.log_done_counter = 0
         self.log_return = [0] * self.num_procs
@@ -116,8 +114,7 @@ class ReinforcementTrainer(object):
             self.memory = memory
 
             self.masks[i] = self.mask
-            self.mask = 1 - \
-                torch.tensor(done, device=device, dtype=torch.float)
+            self.mask = 1 - torch.tensor(done, device=device, dtype=torch.float)
             self.actions[i] = action
             self.values[i] = value
             if self.reshape_reward is not None:
@@ -130,11 +127,9 @@ class ReinforcementTrainer(object):
             self.log_probs[i] = dist.log_prob(action)
 
             # Update log values
-            self.log_episode_return += torch.tensor(
-                reward, device=device, dtype=torch.float)
+            self.log_episode_return += torch.tensor(reward, device=device, dtype=torch.float)
             self.log_episode_reshaped_return += self.rewards[i]
-            self.log_episode_num_frames += torch.ones(
-                self.num_procs, device=device)
+            self.log_episode_num_frames += torch.ones(self.num_procs, device=device)
 
             for i, done_ in enumerate(done):
                 if done_:
