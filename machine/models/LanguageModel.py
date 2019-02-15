@@ -1,10 +1,10 @@
-from .baseModel import BaseModel
+from .baseSeqModel import BaseSeqModel
 from .EncoderRNN import EncoderRNN
 
 import torch.nn as nn
 
 
-class LanguageModel(BaseModel):
+class LanguageModel(BaseSeqModel):
     """
     Implements a language model
 

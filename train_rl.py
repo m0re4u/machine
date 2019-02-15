@@ -9,6 +9,7 @@ import torch
 
 import babyai
 from machine.trainer import ReinforcementTrainer
+from machine.models import ACModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -49,7 +50,7 @@ def train_model():
     # Prepare model
     obss_preprocessor = babyai.utils.ObssPreprocessor(
         model_name, envs[0].observation_space, None)
-    acmodel = babyai.model.ACModel(obss_preprocessor.obs_space, envs[0].action_space,
+    acmodel = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
                                    opt.image_dim, opt.memory_dim, opt.instr_dim,
                                    not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
 
