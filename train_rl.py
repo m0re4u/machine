@@ -13,7 +13,6 @@ from machine.trainer import ReinforcementTrainer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # CONSTANTS
-IGNORE_INDEX = -1
 LOG_FORMAT = '%(asctime)s %(name)-6s %(levelname)-6s %(message)s'
 
 
