@@ -1,9 +1,9 @@
 import torch.nn.functional as F
 
-from .baseModel import BaseModel
+from .baseSeqModel import BaseSeqModel
 
 
-class Seq2seq(BaseModel):
+class Seq2seq(BaseSeqModel):
     """ Standard sequence-to-sequence architecture with configurable encoder
     and decoder.
     """
@@ -18,6 +18,10 @@ class Seq2seq(BaseModel):
         """
         self.encoder_module.rnn.flatten_parameters()
         self.decoder_module.rnn.flatten_parameters()
+
+    def reset_parameters(self):
+        self.encoder_module.rnn.reset_parameters()
+        self.decoder_module.rnn.reset_parameters()
 
     def forward(self, inputs, input_lengths=None, targets={},
                 teacher_forcing_ratio=0):
