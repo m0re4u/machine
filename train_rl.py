@@ -181,7 +181,10 @@ def validate_options(parser, opt):
 def init_logging(opt):
     logging.basicConfig(format=LOG_FORMAT, level=getattr(
         logging, opt.log_level.upper()))
-    logging.info(opt)
+    config = vars(opt)
+    logging.info("Parameters:")
+    for k, v in config.items():
+        logging.info(f"  {k:>21} : {v}")
 
 
 if __name__ == "__main__":

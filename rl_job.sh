@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -N 2
+#SBATCH -N 1
 #SBATCH -p gpu_short
 #SBATCH -t 00:30:00
 
