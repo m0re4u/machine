@@ -497,3 +497,22 @@ class BLEU(Metric):
                 hypothesis = hypothesis[:eos_index]
 
             self.stats += np.array(self.bleu_stats(hypothesis, reference))
+
+
+class FrobeniusNorm(Metric):
+    _NAME = "FrobeniusNorm"
+    _SHORTNAME = "fro"
+    _INPUT = "fronorm"
+
+    def __init__(self):
+        super(FrobeniusNorm, self).__init__(self._NAME, self._SHORTNAME, self._INPUT)
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+
+    def get_val(self):
+        return self.val
+
+    def eval_batch(self, A, B):
+        self.val = np.linalg.norm(A - B, ord='fro')

@@ -6,7 +6,7 @@ import numpy
 import torch
 
 import machine
-from babyai.rl.utils import DictList
+from machine.util import DictList
 from machine.util.callbacks import EpisodeLogger
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

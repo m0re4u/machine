@@ -73,7 +73,7 @@ def init_argparser():
     parser = argparse.ArgumentParser()
 
     # Training algorithm arguments
-    parser.add_argument('--env-name',
+    parser.add_argument('--env-name', required=True,
                         help='Name of the environment to use')
     parser.add_argument('--use-gae', action='store_true', default=False,
                         help='use generalized advantage estimation')
