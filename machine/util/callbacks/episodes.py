@@ -5,7 +5,6 @@ import os
 import numpy as np
 
 from machine.util.callbacks import Callback
-from tensorboardX import SummaryWriter
 
 
 class EpisodeLogger(Callback):
@@ -24,6 +23,7 @@ class EpisodeLogger(Callback):
 
         self.logger = logging.getLogger("EpisodeLogger")
         if use_tensorboard:
+            from tensorboardX import SummaryWriter
             self.logger.info("Using Tensorboard")
             self.writer = SummaryWriter('runs')
         else:
