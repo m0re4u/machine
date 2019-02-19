@@ -18,13 +18,17 @@ LOG_FORMAT = '%(asctime)s %(name)-6s %(levelname)-6s %(message)s'
 
 
 def train_model():
-    # Create command line argument parser and validate chosen options
+    # Create command line argument parser
     parser = init_argparser()
     opt = parser.parse_args()
+
+    # Start logger first
+    init_logging(opt.log_level)
+
+    #  validate chosen options
     opt = validate_options(parser, opt)
 
     # Prepare logging and environment
-    init_logging(opt)
     envs = []
     for i in range(opt.num_processes):
         env = gym.make(opt.env_name)
@@ -154,7 +158,7 @@ def init_argparser():
     parser.add_argument('--output_dir', default='../models',
                         help='Path to model directory. If load_checkpoint is True, then path to checkpoint directory has to be provided')
     parser.add_argument('--log-level',
-                        help='Logging level.', default='info')
+                        help='Logging level.', default='info', choices=['info','debug','warning','error','notset','critical'])
     parser.add_argument('--write-logs',
                         help='Specify file to write logs to after training')
     parser.add_argument('--cuda_device', default=0,
@@ -165,11 +169,10 @@ def init_argparser():
 
 def validate_options(parser, opt):
     if opt.resume and not opt.load_checkpoint:
-        parser.error(
-            'load_checkpoint argument is required to resume training from checkpoint')
+        parser.error("load_checkpoint argument is required to resume training from checkpoint")
 
     if torch.cuda.is_available():
-        logging.info("CUDA device set to %i" % opt.cuda_device)
+        logging.info(f"CUDA device set to {opt.cuda_device}")
         torch.cuda.set_device(opt.cuda_device)
     else:
         logging.info("CUDA not available")
@@ -177,17 +180,17 @@ def validate_options(parser, opt):
     torch.manual_seed(opt.seed)
     torch.cuda.manual_seed_all(opt.seed)
 
-    return opt
-
-
-def init_logging(opt):
-    logging.basicConfig(format=LOG_FORMAT, level=getattr(
-        logging, opt.log_level.upper()))
     config = vars(opt)
     logging.info("Parameters:")
     for k, v in config.items():
         logging.info(f"  {k:>21} : {v}")
 
+    return opt
+
+
+def init_logging(level):
+    logging.basicConfig(format=LOG_FORMAT, level=getattr(
+        logging, level.upper()))
 
 if __name__ == "__main__":
     train_model()
