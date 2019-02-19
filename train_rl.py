@@ -156,11 +156,9 @@ def init_argparser():
     parser.add_argument('--print_every', type=int,
                         help='Every how many batches to print results', default=100)
     parser.add_argument('--output_dir', default='../models',
-                        help='Path to model directory. If load_checkpoint is True, then path to checkpoint directory has to be provided')
+                        help='Path to output model directory to save checkpoints in.')
     parser.add_argument('--log-level',
                         help='Logging level.', default='info', choices=['info','debug','warning','error','notset','critical'])
-    parser.add_argument('--write-logs',
-                        help='Specify file to write logs to after training')
     parser.add_argument('--cuda_device', default=0,
                         type=int, help='set cuda device to use')
 

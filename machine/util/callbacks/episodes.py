@@ -1,6 +1,6 @@
-
 import logging
 import os
+import time
 
 import numpy as np
 
@@ -11,11 +11,14 @@ class EpisodeLogger(Callback):
     """
     Callback that is used to log information during training of a reinforcement
     agent.
-    Note that this abuses the callback function names, since we do not have
-    a similar setup as supervised learning. Now, we consider the following
-    semantics:
-        epoch: episode
-        batch: step
+
+    Note that we expand on the functions, as we assume a PPO algorithm setup,
+    which is different from supervised learnig.
+
+    Now, we consider the following additional steps:
+        - cycle: Outer iterations of PPO
+        - epoch: Epochs in update_parameters()
+        - batch: Batches in update_parameters()
     """
 
     def __init__(self, use_tensorboard=False):
@@ -51,9 +54,10 @@ class EpisodeLogger(Callback):
         self.logger.info("Finished training")
 
     def on_cycle_start(self):
-        pass
+        self.cycle_start_time = time.time()
 
-    def on_cycle_end(self, status, logs, cycle_time):
+    def on_cycle_end(self, status, logs):
+        cycle_time = time.time() - self.cycle_start_time
         fps = logs['num_frames'] / cycle_time
         return_per_episode = get_stats(logs["return_per_episode"])
         success_per_episode = get_stats(
@@ -76,7 +80,7 @@ class EpisodeLogger(Callback):
             logs["grad_norm"]
         ]
 
-        format_str = ("U {} | E {} | F {:6} | FPS {:3.0f} | D {} | R:xsmM {: .2f} {: .2f} {: .2f} {: .2f} | "
+        format_str = ("U {} | E {} | F {:6} | FPS {:3.0f} | D {:1.2f} | R:xsmM {: .2f} {: .2f} {: .2f} {: .2f} | "
                       "S {:.2f} | F:xsmM {:.1f} {:.1f} {} {} | H {:.3f} | V {:.3f} | "
                       "pL {: .3f} | vL {:.3f} | L {:.3f} | gN {:.3f} | ")
 

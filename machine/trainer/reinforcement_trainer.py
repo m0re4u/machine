@@ -316,7 +316,7 @@ class ReinforcementTrainer(object):
 
     def train(self):
         """
-        Perfor a series on training steps as configured.
+        Perform a series on training steps as configured.
         """
         # Start training model
         self.callback.on_train_begin()
@@ -329,18 +329,18 @@ class ReinforcementTrainer(object):
         }
         while self.status['num_frames'] < self.frames:
             self.callback.on_cycle_start()
-            update_start_time = time.time()
 
             # Create experiences and update the training status
             exps, logs = self.collect_experiences()
-            self.status['num_frames'] += logs['num_frames']
-            self.status['num_episodes'] += logs['episodes_done']
-            self.status['i'] += 1
 
             # Use experience to update policy
             logs = self.update_model_parameters(exps, logs)
-            cycle_time = int(time.time() - update_start_time)
-            self.callback.on_cycle_end(self.status, logs, cycle_time)
+
+            self.status['num_frames'] += logs['num_frames']
+            self.status['num_episodes'] += logs['episodes_done']
+            self.status['i'] += 1
+            self.callback.on_cycle_end(self.status, logs)
+
 
         self.callback.on_train_end()
 
