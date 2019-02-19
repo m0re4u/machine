@@ -169,8 +169,10 @@ def validate_options(parser, opt):
             'load_checkpoint argument is required to resume training from checkpoint')
 
     if torch.cuda.is_available():
-        logging.info("Cuda device set to %i" % opt.cuda_device)
+        logging.info("CUDA device set to %i" % opt.cuda_device)
         torch.cuda.set_device(opt.cuda_device)
+    else:
+        logging.info("CUDA not available")
 
     torch.manual_seed(opt.seed)
     torch.cuda.manual_seed_all(opt.seed)
