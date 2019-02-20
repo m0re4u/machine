@@ -8,9 +8,10 @@ from machine.util.callbacks import Callback
 
 class ModelCheckpoint(Callback):
     """
-    Model checkpoint to save weights during training. 
-    This callback is automatically applied for every model that
-    is trained with the SupervisedTrainer.
+    Model checkpoint to save weights during training.
+
+    This callback is automatically applied for every model that is trained with
+    the SupervisedTrainer.
     """
 
     def __init__(self, top_k=5, monitor='val',

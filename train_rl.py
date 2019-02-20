@@ -67,7 +67,7 @@ def train_model():
     # Prepare trainer
     from babyai.rl.utils import ParallelEnv
     trainer = ReinforcementTrainer(ParallelEnv(
-        envs), opt, acmodel, obss_preprocessor, reshape_reward, 'ppo')
+        envs), opt, acmodel, model_name, obss_preprocessor, reshape_reward, 'ppo')
 
     # Start training
     trainer.train()
@@ -155,7 +155,7 @@ def init_argparser():
                         help='Every how many batches the model should be saved', default=100)
     parser.add_argument('--print_every', type=int,
                         help='Every how many batches to print results', default=100)
-    parser.add_argument('--output_dir', default='../models',
+    parser.add_argument('--output_dir', default='models',
                         help='Path to output model directory to save checkpoints in.')
     parser.add_argument('--log-level',
                         help='Logging level.', default='info', choices=['info','debug','warning','error','notset','critical'])

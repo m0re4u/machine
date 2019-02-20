@@ -7,8 +7,9 @@ import logging
 import torch
 import dill
 
+from .base_checkpoint import BaseCheckpoint
 
-class Checkpoint(object):
+class Checkpoint(BaseCheckpoint):
     """
     The Checkpoint class manages the saving and loading of a model during training. It allows training to be suspended
     and resumed at a later time (e.g. when running on a cluster using sequential jobs).
@@ -30,11 +31,6 @@ class Checkpoint(object):
         INPUT_VOCAB_FILE (str): name of the input vocab file
         OUTPUT_VOCAB_FILE (str): name of the output vocab file
     """
-
-    TRAINER_STATE_NAME = 'trainer_states.pt'
-    MODEL_NAME = 'model.pt'
-    INPUT_VOCAB_FILE = 'input_vocab.pt'
-    OUTPUT_VOCAB_FILE = 'output_vocab.pt'
 
     def __init__(self, model, optimizer, epoch, step,
                  input_vocab, output_vocab, path=None):
@@ -112,9 +108,50 @@ class Checkpoint(object):
         with open(os.path.join(path, cls.OUTPUT_VOCAB_FILE), 'rb') as fin:
             output_vocab = dill.load(fin)
         optimizer = resume_checkpoint['optimizer']
-        return Checkpoint(model=model, input_vocab=input_vocab,
-                          output_vocab=output_vocab,
-                          optimizer=optimizer,
+        return Checkpoint(model=model,
                           epoch=resume_checkpoint['epoch'],
                           step=resume_checkpoint['step'],
+                          input_vocab=input_vocab,
+                          output_vocab=output_vocab,
+                          optimizer=optimizer,
                           path=path)
+
+
+
+class RLCheckpoint(BaseCheckpoint):
+    CHECKPOINT_NAME='check.pt'
+
+    def __init__(self, model, optimizer, status, obs, path=None):
+        self.model = model
+        self.optimizer = optimizer
+        self.status = status
+        self.obs = obs
+        if path is None:
+            # some default
+            pass
+        else:
+            self._path = path
+
+    def path(self):
+        if self._path is None:
+            raise LookupError("The checkpoint has not been saved.")
+        return self._path
+
+    def save(self):
+        logger = logging.getLogger(__name__)
+
+        name = f"{self.status['i']}_{self.CHECKPOINT_NAME}"
+        path = os.path.join(self._path, name)
+        state = {
+            'i': self.status['i'],
+            'num_episodes': self.status['num_episodes'],
+            'num_frames': self.status['num_frames'],
+            'optimizer': self.optimizer.state_dict(),
+            'model': self.model.state_dict()
+        }
+        logger.info(f"Saving checkpoint to {path}")
+        torch.save(state, path)
+
+    @classmethod
+    def load(self):
+        pass

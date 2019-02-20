@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 import time
 
 import numpy
@@ -20,7 +21,7 @@ class ReinforcementTrainer(object):
     Largely inspired by babyAI repo code for PPOAlgo
     """
 
-    def __init__(self, envs, opt, model, obs, reshape_reward, algo_name='ppo'):
+    def __init__(self, envs, opt, model, model_name, obs, reshape_reward, algo_name='ppo'):
         self._trainer = "Reinforcement Trainer"
         self._algo = algo_name
         self.env = envs
@@ -29,6 +30,7 @@ class ReinforcementTrainer(object):
         self.preprocess_obss = obs
         self.reshape_reward = reshape_reward
         self.logger = logging.getLogger(__name__)
+        self.model_path = os.path.join(opt.output_dir, model_name)
 
         # Copy command-line arguments to class
         self.frames = opt.frames
@@ -70,7 +72,8 @@ class ReinforcementTrainer(object):
         self.log_episode_num_frames = torch.zeros(
             self.num_procs, device=device)
 
-        self.callback = EpisodeLogger(opt.tb)
+        self.callback = EpisodeLogger(opt.print_every, opt.save_every, opt.output_dir, opt.tb)
+        self.callback.set_trainer(self)
 
         self.log_done_counter = 0
         self.log_return = [0] * self.num_procs
@@ -321,7 +324,6 @@ class ReinforcementTrainer(object):
         # Start training model
         self.callback.on_train_begin()
         total_start_time = time.time()
-        best_success_rate = 0
         self.status = {
             'i': 0,
             'num_frames': 0,
@@ -340,7 +342,6 @@ class ReinforcementTrainer(object):
             self.status['num_episodes'] += logs['episodes_done']
             self.status['i'] += 1
             self.callback.on_cycle_end(self.status, logs)
-
 
         self.callback.on_train_end()
 

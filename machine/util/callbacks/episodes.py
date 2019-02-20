@@ -5,6 +5,7 @@ import time
 import numpy as np
 
 from machine.util.callbacks import Callback
+from machine.util.checkpoint import RLCheckpoint
 
 
 class EpisodeLogger(Callback):
@@ -21,10 +22,19 @@ class EpisodeLogger(Callback):
         - batch: Batches in update_parameters()
     """
 
-    def __init__(self, use_tensorboard=False):
+    def __init__(self, print_every=10, save_every=10, output_dir=None, use_tensorboard=False):
         super(EpisodeLogger, self).__init__()
 
         self.logger = logging.getLogger("EpisodeLogger")
+
+        self.print_every = print_every
+        self.save_every = save_every
+        if output_dir is None:
+            # some default value
+            pass
+        else:
+            self.output_dir = output_dir
+
         if use_tensorboard:
             from tensorboardX import SummaryWriter
             self.logger.info("Using Tensorboard")
@@ -84,10 +94,22 @@ class EpisodeLogger(Callback):
                       "S {:.2f} | F:xsmM {:.1f} {:.1f} {} {} | H {:.3f} | V {:.3f} | "
                       "pL {: .3f} | vL {:.3f} | L {:.3f} | gN {:.3f} | ")
 
-        self.logger.info(format_str.format(*data))
+        if status['i'] % self.print_every == 0:
+            self.logger.info(format_str.format(*data))
+        if status['i'] % self.save_every == 0:
+            check = RLCheckpoint(
+                self.trainer.model,
+                self.trainer.optimizer,
+                status,
+                self.trainer.preprocess_obss,
+                self.trainer.model_path
+            )
+            check.save()
+            self.trainer.preprocess_obss.vocab.save()
         if self.writer is not None:
             self.writer.add_scalar('train/fps', fps, status['i'])
-            self.writer.add_scalar('train/succes', success_per_episode['mean'], status['i'])
+            self.writer.add_scalar(
+                'train/succes', success_per_episode['mean'], status['i'])
 
 
 def get_stats(arr):
