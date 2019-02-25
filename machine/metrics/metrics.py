@@ -504,9 +504,11 @@ class FrobeniusNorm(Metric):
     _SHORTNAME = "fro"
     _INPUT = "fronorm"
 
-    def __init__(self):
-        super(FrobeniusNorm, self).__init__(self._NAME, self._SHORTNAME, self._INPUT)
+    def __init__(self, binary=False):
+        super(FrobeniusNorm, self).__init__(
+            self._NAME, self._SHORTNAME, self._INPUT)
         self.reset()
+        self.binary = binary
 
     def reset(self):
         self.val = 0
@@ -515,8 +517,13 @@ class FrobeniusNorm(Metric):
         return self.val
 
     def eval_batch(self, A, B):
-        if len(A.shape) > 2:
-            norms = np.linalg.norm(A - B, ord='fro', axis=(1,2))
-            self.val = np.sum(norms)
+        if self.binary:
+            # count number of different cells
+            self.val = torch.nonzero(A - B).size()[0]
         else:
-            self.val = np.linalg.norm(A - B, ord='fro', axis=None)
+            # True Frobenius Norm
+            if len(A.shape) > 2:
+                norms = np.linalg.norm(A - B, ord='fro', axis=(1, 2))
+                self.val = np.sum(norms)
+            else:
+                self.val = np.linalg.norm(A - B, ord='fro', axis=None)

@@ -86,8 +86,11 @@ class TestDisruptiveness(unittest.TestCase):
                                          [0., 0., 0., 0., 0., 0., 0.],
                                          [0., 0., 0., 0., 0., 0., 0.],
                                          [0., 0., 0., 0., 0., 0., 0.]]])
+
         self.ans_2 = np.sqrt(230) + np.sqrt(371)
 
+        # self.state_diff_binary = torch.nonzero(self.state_diff)
+        self.ans_3 = 37
 
     def test_fn(self):
         fn = FrobeniusNorm()
@@ -100,3 +103,9 @@ class TestDisruptiveness(unittest.TestCase):
         fn.eval_batch(self.state_1, self.state_2)
         val = fn.get_val()
         self.assertAlmostEqual(val, self.ans_2, places=5)
+
+    def test_full_binary(self):
+        fn = FrobeniusNorm(binary=True)
+        fn.eval_batch(self.state_1, self.state_2)
+        val = fn.get_val()
+        self.assertAlmostEqual(val, self.ans_3, places=5)
