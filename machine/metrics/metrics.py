@@ -515,4 +515,8 @@ class FrobeniusNorm(Metric):
         return self.val
 
     def eval_batch(self, A, B):
-        self.val = np.linalg.norm(A - B, ord='fro')
+        if len(A.shape) > 2:
+            norms = np.linalg.norm(A - B, ord='fro', axis=(1,2))
+            self.val = np.sum(norms)
+        else:
+            self.val = np.linalg.norm(A - B, ord='fro', axis=None)
