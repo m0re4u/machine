@@ -81,14 +81,10 @@ def init_argparser():
                         help='Name of the environment to use')
     parser.add_argument('--use-gae', action='store_true', default=False,
                         help='use generalized advantage estimation')
-    parser.add_argument('--gae-lambda', type=float, default=0.95,
-                        help='gae parameter (default: 0.95)')
-    parser.add_argument('--lr', type=float, help='Learning rate, recommended \
-                        settings.\nrecommended settings: adam=0.001 \
-                        adadelta=1.0 adamax=0.002 rmsprop=0.01 sgd=0.1',
-                        default=0.001)
-    parser.add_argument('--value-loss-coef', type=float, default=0.5,
-                        help='value loss coefficient (default: 0.5)')
+    parser.add_argument('--lr', type=float, help='Learning rate.\n\
+                        Recommended settings: adam=0.001 adadelta=1.0 \
+                        adamax=0.002 rmsprop=0.01 sgd=0.1 (default: 0.0001)',
+                        default=0.0001)
     parser.add_argument('--num-processes', type=int, default=16,
                         help='how many training CPU processes to use (default: 16)')
     parser.add_argument('--num-steps', type=int, default=5,
@@ -101,10 +97,6 @@ def init_argparser():
                         help='use a linear schedule on the ppo clipping parameter')
     parser.add_argument('--entropy-coef', type=float, default=0.01,
                         help='entropy term coefficient (default: 0.01)')
-    parser.add_argument('--gamma', type=float, default=0.99,
-                        help='discount factor for rewards (default: 0.99)')
-    parser.add_argument('--max-grad-norm', type=float, default=0.5,
-                        help='max norm of gradients (default: 0.5)')
     parser.add_argument('--seed', type=int, default=1,
                         help='random seed (default: 1)')
     parser.add_argument('--num-env-steps', type=int, default=10e6,
@@ -113,20 +105,30 @@ def init_argparser():
                         help="number of frames per process before update (default: 40)")
     parser.add_argument("--optim-eps", type=float, default=1e-5,
                         help="Adam and RMSprop optimizer epsilon (default: 1e-5)")
-    parser.add_argument("--reward-scale", type=float, default=20.,
-                        help="Reward scale multiplier")
     parser.add_argument("--recurrence", type=int, default=20,
                         help="number of timesteps gradient is backpropagated (default: 20)")
-    parser.add_argument("--clip-eps", type=float, default=0.2,
-                        help="clipping epsilon for PPO (default: 0.2)")
     parser.add_argument("--frames", type=int, default=int(9e10),
                         help="number of frames of training (default: 9e10)")
     parser.add_argument("--beta1", type=float, default=0.9,
                         help="beta1 for Adam (default: 0.9)")
     parser.add_argument("--beta2", type=float, default=0.999,
                         help="beta2 for Adam (default: 0.999)")
-    parser.add_argument('--ppo-epochs', type=int,
-                        help='Number of epochs', default=6)
+
+    # PPO arguments
+    parser.add_argument('--gamma', type=float, default=0.99,
+                        help='discount factor for rewards (default: 0.99)')
+    parser.add_argument("--reward-scale", type=float, default=20.,
+                        help="Reward scale multiplier")
+    parser.add_argument('--gae-lambda', type=float, default=0.99,
+                        help='gae parameter (default: 0.99)')
+    parser.add_argument('--value-loss-coef', type=float, default=0.5,
+                        help='value loss coefficient (default: 0.5)')
+    parser.add_argument('--max-grad-norm', type=float, default=0.5,
+                        help='max norm of gradients (default: 0.5)')
+    parser.add_argument("--clip-eps", type=float, default=0.2,
+                        help="clipping epsilon for PPO (default: 0.2)")
+    parser.add_argument('--ppo-epochs', type=int, default=4,
+                        help='Number of epochs (default: 4)')
 
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
