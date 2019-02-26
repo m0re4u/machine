@@ -109,7 +109,8 @@ class EpisodeLogger(Callback):
         if self.writer is not None:
             self.writer.add_scalar('train/fps', fps, status['i'])
             self.writer.add_scalar(
-                'train/succes', success_per_episode['mean'], status['i'])
+                'train/succes_rate', success_per_episode['mean'], status['i'])
+            self.writer.add_scalar('train/episode_length', num_frames_per_episode['mean'], status['i'])
 
 
 def get_stats(arr):
