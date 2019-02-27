@@ -181,7 +181,7 @@ class RLCheckpoint(BaseCheckpoint):
         """
         logger = logging.getLogger(__name__)
         logger.info(f"Loading RLCheckpoint from {path}")
-        state = torch.load(path)
+        state = torch.load(path, map_location=torch.device('cpu'))
         params = [
             state['model_params']['obs_space'],
             state['model_params']['action_space'],
