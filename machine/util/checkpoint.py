@@ -1,13 +1,17 @@
 from __future__ import print_function
-import os
-import time
-import shutil
-import logging
 
-import torch
+import logging
+import os
+import shutil
+import time
+
 import dill
+import torch
+
+from machine.models import ACModel
 
 from .base_checkpoint import BaseCheckpoint
+
 
 class Checkpoint(BaseCheckpoint):
     """
@@ -140,18 +144,57 @@ class RLCheckpoint(BaseCheckpoint):
     def save(self):
         logger = logging.getLogger(__name__)
 
-        name = f"{self.status['i']}_{self.CHECKPOINT_NAME}"
+        name = f"{self.status['i']:06}_{self.CHECKPOINT_NAME}"
         path = os.path.join(self._path, name)
         state = {
             'i': self.status['i'],
             'num_episodes': self.status['num_episodes'],
             'num_frames': self.status['num_frames'],
             'optimizer': self.optimizer.state_dict(),
-            'model': self.model.state_dict()
+            'model': self.model.state_dict(),
+            'model_params': {
+                'obs_space': self.model.obs_space,
+                'action_space': self.model.action_space,
+                'image_dim': self.model.image_dim,
+                'memory_dim': self.model.memory_dim,
+                'instr_dim': self.model.instr_dim,
+                'use_instr': self.model.use_instr,
+                'lang_model': self.model.lang_model,
+                'use_memory': self.model.use_memory,
+                'arch': self.model.arch,
+            }
         }
-        logger.info(f"Saving checkpoint to {path}")
+        logger.info(f"Saving RLCheckpoint to {path}")
         torch.save(state, path)
 
     @classmethod
-    def load(self):
+    def load(cls, path):
+        """
+        Load entire training state to resume training
+        """
         pass
+
+    @classmethod
+    def load_model(cls, path):
+        """
+        Only load a model to perform some evaluation runs
+        """
+        logger = logging.getLogger(__name__)
+        logger.info(f"Loading RLCheckpoint from {path}")
+        state = torch.load(path)
+        params = [
+            state['model_params']['obs_space'],
+            state['model_params']['action_space'],
+            state['model_params']['image_dim'],
+            state['model_params']['memory_dim'],
+            state['model_params']['instr_dim'],
+            state['model_params']['use_instr'],
+            state['model_params']['lang_model'],
+            state['model_params']['use_memory'],
+            state['model_params']['arch'],
+        ]
+        model = ACModel(*params)
+        model.load_state_dict(state['model'])
+        print(model)
+        model.eval()
+        return model

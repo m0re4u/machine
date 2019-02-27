@@ -68,6 +68,7 @@ class ACModel(BaseModel):
         self.instr_dim = instr_dim
 
         self.obs_space = obs_space
+        self.action_space = action_space
 
         if arch == "cnn1":
             self.image_conv = nn.Sequential(
