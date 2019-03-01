@@ -22,23 +22,19 @@ class EpisodeLogger(Callback):
         - batch: Batches in update_parameters()
     """
 
-    def __init__(self, print_every=10, save_every=10, output_dir=None, use_tensorboard=False):
+    def __init__(self, print_every=10, save_every=10, model_name='', use_tensorboard=False):
         super(EpisodeLogger, self).__init__()
 
         self.logger = logging.getLogger("EpisodeLogger")
 
         self.print_every = print_every
         self.save_every = save_every
-        if output_dir is None:
-            # some default value
-            pass
-        else:
-            self.output_dir = output_dir
+        self.model_name = model_name
 
         if use_tensorboard:
             from tensorboardX import SummaryWriter
             self.logger.info("Using Tensorboard")
-            self.writer = SummaryWriter('runs')
+            self.writer = SummaryWriter(os.path.join('runs', self.model_name))
         else:
             self.writer = None
 

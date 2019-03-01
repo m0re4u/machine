@@ -72,7 +72,7 @@ class ReinforcementTrainer(object):
         self.log_episode_num_frames = torch.zeros(
             self.num_procs, device=device)
 
-        self.callback = EpisodeLogger(opt.print_every, opt.save_every, opt.output_dir, opt.tb)
+        self.callback = EpisodeLogger(opt.print_every, opt.save_every, model_name, opt.tb)
         self.callback.set_trainer(self)
 
         self.log_done_counter = 0
