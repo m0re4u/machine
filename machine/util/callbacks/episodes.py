@@ -107,6 +107,7 @@ class EpisodeLogger(Callback):
             self.writer.add_scalar(
                 'train/succes_rate', success_per_episode['mean'], status['i'])
             self.writer.add_scalar('train/episode_length', num_frames_per_episode['mean'], status['i'])
+            self.writer.add_scalar('train/disrupt', logs["disrupts"], status['i'])
 
 
 def get_stats(arr):

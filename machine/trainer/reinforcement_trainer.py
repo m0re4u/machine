@@ -9,6 +9,7 @@ import torch
 import machine
 from machine.util import DictList
 from machine.util.callbacks import EpisodeLogger
+from machine.metrics import FrobeniusNorm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -54,8 +55,10 @@ class ReinforcementTrainer(object):
         self.obs = self.env.reset()
         self.obss = [None]*(shape[0])
 
-        self.memory = torch.zeros(shape[1], self.model.memory_size, device=device)
-        self.memories = torch.zeros(*shape, self.model.memory_size, device=device)
+        self.memory = torch.zeros(
+            shape[1], self.model.memory_size, device=device)
+        self.memories = torch.zeros(
+            *shape, self.model.memory_size, device=device)
 
         self.mask = torch.ones(shape[1], device=device)
         self.masks = torch.zeros(*shape, device=device)
@@ -72,13 +75,18 @@ class ReinforcementTrainer(object):
         self.log_episode_num_frames = torch.zeros(
             self.num_procs, device=device)
 
-        self.callback = EpisodeLogger(opt.print_every, opt.save_every, model_name, opt.tb)
+        self.callback = EpisodeLogger(
+            opt.print_every, opt.save_every, model_name, opt.tb)
         self.callback.set_trainer(self)
 
         self.log_done_counter = 0
         self.log_return = [0] * self.num_procs
         self.log_reshaped_return = [0] * self.num_procs
         self.log_num_frames = [0] * self.num_procs
+
+        self.disrupt_fn = FrobeniusNorm(binary=True)
+        self.explore_for = opt.explore_for
+        self.disrupt_mode = opt.disrupt
 
         if algo_name == 'ppo':
             assert opt.batch_size % opt.recurrence == 0
@@ -103,7 +111,6 @@ class ReinforcementTrainer(object):
                 dist = model_results['dist']
                 value = model_results['value']
                 memory = model_results['memory']
-                extra_predictions = model_results['extra_predictions']
 
             action = dist.sample()
 
@@ -117,7 +124,8 @@ class ReinforcementTrainer(object):
             self.memory = memory
 
             self.masks[i] = self.mask
-            self.mask = 1 - torch.tensor(done, device=device, dtype=torch.float)
+            self.mask = 1 - \
+                torch.tensor(done, device=device, dtype=torch.float)
             self.actions[i] = action
             self.values[i] = value
             if self.reshape_reward is not None:
@@ -130,9 +138,11 @@ class ReinforcementTrainer(object):
             self.log_probs[i] = dist.log_prob(action)
 
             # Update log values
-            self.log_episode_return += torch.tensor(reward, device=device, dtype=torch.float)
+            self.log_episode_return += torch.tensor(
+                reward, device=device, dtype=torch.float)
             self.log_episode_reshaped_return += self.rewards[i]
-            self.log_episode_num_frames += torch.ones(self.num_procs, device=device)
+            self.log_episode_num_frames += torch.ones(
+                self.num_procs, device=device)
 
             for i, done_ in enumerate(done):
                 if done_:
@@ -168,7 +178,6 @@ class ReinforcementTrainer(object):
 
         # Flatten the data correctly, making sure that
         # each episode's data is a continuous chunk
-
         exps = DictList()
         exps.obs = [self.obss[i][j]
                     for j in range(self.num_procs)
@@ -227,6 +236,7 @@ class ReinforcementTrainer(object):
             log_value_losses = []
             log_grad_norms = []
             log_losses = []
+            log_disrupts = []
 
             for inds in self._get_batches_starting_indexes():
                 self.callback.on_batch_begin(None)
@@ -235,6 +245,7 @@ class ReinforcementTrainer(object):
                 batch_policy_loss = 0
                 batch_value_loss = 0
                 batch_loss = 0
+                batch_disrupt = 0
 
                 memory = exps.memory[inds]
 
@@ -247,10 +258,18 @@ class ReinforcementTrainer(object):
                     dist = model_results['dist']
                     value = model_results['value']
                     memory = model_results['memory']
-                    extra_predictions = model_results['extra_predictions']
+
+                    disrupt_val = torch.tensor(1)
+                    if i < self.recurrence - 1 and self.disrupt_mode < 2:
+                        s1 = sb.obs.image
+                        s2 = exps[inds + i + 1].obs.image
+                        disrupt_val = torch.sum(s1 != s2, dtype=torch.float)
+                        if self.disrupt_mode == 0:
+                            disrupt_val = torch.log(disrupt_val)
+                            disrupt_val = torch.clamp(disrupt_val, min=.01, max=5)
+
 
                     entropy = dist.entropy().mean()
-
                     ratio = torch.exp(dist.log_prob(
                         sb.action) - sb.log_prob)
                     surr1 = ratio * sb.advantage
@@ -265,19 +284,18 @@ class ReinforcementTrainer(object):
                     surr2 = (value_clipped - sb.returnn).pow(2)
                     value_loss = torch.max(surr1, surr2).mean()
 
-                    loss = policy_loss - self.entropy_coef * \
-                        entropy + self.value_loss_coef * value_loss
+                    loss = (policy_loss  * disrupt_val) - self.entropy_coef * \
+                        entropy + (self.value_loss_coef * value_loss)
 
                     # Update batch values
-
                     batch_entropy += entropy.item()
                     batch_value += value.mean().item()
                     batch_policy_loss += policy_loss.item()
                     batch_value_loss += value_loss.item()
                     batch_loss += loss
+                    batch_disrupt += disrupt_val
 
                     # Update memories for next epoch
-
                     if i < self.recurrence - 1:
                         exps.memory[inds + i + 1] = memory.detach()
 
@@ -287,6 +305,7 @@ class ReinforcementTrainer(object):
                 batch_policy_loss /= self.recurrence
                 batch_value_loss /= self.recurrence
                 batch_loss /= self.recurrence
+                batch_disrupt /= self.recurrence
 
                 # Update actor-critic
                 self.optimizer.zero_grad()
@@ -304,6 +323,7 @@ class ReinforcementTrainer(object):
                 log_value_losses.append(batch_value_loss)
                 log_grad_norms.append(grad_norm.item())
                 log_losses.append(batch_loss.item())
+                log_disrupts.append(batch_disrupt)
                 self.callback.on_batch_end(None)
 
             # Log some values
@@ -313,6 +333,7 @@ class ReinforcementTrainer(object):
             logs["value_loss"] = numpy.mean(log_value_losses)
             logs["grad_norm"] = numpy.mean(log_grad_norms)
             logs["loss"] = numpy.mean(log_losses)
+            logs["disrupts"] = numpy.mean(log_disrupts)
             e_i += 1
             self.callback.on_epoch_end()
         return logs

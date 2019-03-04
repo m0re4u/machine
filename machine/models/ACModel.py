@@ -219,15 +219,13 @@ class ACModel(BaseModel):
         if self.use_instr and not "filmcnn" in self.arch:
             embedding = torch.cat((embedding, instr_embedding), dim=1)
 
-        extra_predictions = dict()
-
         x = self.actor(embedding)
         dist = Categorical(logits=F.log_softmax(x, dim=1))
 
         x = self.critic(embedding)
         value = x.squeeze(1)
 
-        return {'dist': dist, 'value': value, 'memory': memory, 'extra_predictions': extra_predictions}
+        return {'dist': dist, 'value': value, 'memory': memory}
 
     def _get_instr_embedding(self, instr):
         if self.lang_model == 'gru':

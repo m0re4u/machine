@@ -74,21 +74,17 @@ def train_model():
 
 
 def init_argparser():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 
     # Training algorithm arguments
     parser.add_argument('--env-name', required=True,
                         help='Name of the environment to use')
     parser.add_argument('--use-gae', action='store_true', default=False,
                         help='use generalized advantage estimation')
-    parser.add_argument('--lr', type=float, help='Learning rate.\n\
-                        Recommended settings: adam=0.001 adadelta=1.0 \
-                        adamax=0.002 rmsprop=0.01 sgd=0.1 (default: 0.0001)',
+    parser.add_argument('--lr', type=float, help='Learning rate. Recommended settings:\n  adam=0.001\n  adadelta=1.0\n  adamax=0.002\n  rmsprop=0.01\n  sgd=0.1\n  (default: 0.0001)',
                         default=0.0001)
     parser.add_argument('--num-processes', type=int, default=16,
                         help='how many training CPU processes to use (default: 16)')
-    parser.add_argument('--num-steps', type=int, default=5,
-                        help='number of forward steps in A2C (default: 5)')
     parser.add_argument('--batch_size', type=int, default=1280,
                         help='number of batches for ppo (default: 1280)')
     parser.add_argument('--use-linear-lr-decay', action='store_true', default=False,
@@ -114,6 +110,12 @@ def init_argparser():
     parser.add_argument("--beta2", type=float, default=0.999,
                         help="beta2 for Adam (default: 0.999)")
 
+    # Curiosity arguments
+    parser.add_argument('--explore_for', type=int, default=10,
+                        help='Explore for amount of cycles (default: 10)')
+    parser.add_argument('--disrupt', type=int, default=1,
+                        help="Add disruptiveness metric as multiplier to policy loss with the following settings:\n  0: log(sum(binary_diff)), clipped to [0.01, 5]\n")
+
     # PPO arguments
     parser.add_argument('--gamma', type=float, default=0.99,
                         help='discount factor for rewards (default: 0.99)')
@@ -136,7 +138,7 @@ def init_argparser():
     parser.add_argument("--memory-dim", type=int, default=128,
                         help="dimensionality of the memory LSTM")
     parser.add_argument("--instr-dim", type=int, default=128,
-                        help="dimensionality of the memory LSTM")
+                        help="dimensionality of the instruction LSTM")
     parser.add_argument("--no-instr", action="store_true", default=False,
                         help="don't use instructions in the model")
     parser.add_argument("--instr-arch", default="gru",
