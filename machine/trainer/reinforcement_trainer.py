@@ -323,7 +323,7 @@ class ReinforcementTrainer(object):
                 log_value_losses.append(batch_value_loss)
                 log_grad_norms.append(grad_norm.item())
                 log_losses.append(batch_loss.item())
-                log_disrupts.append(batch_disrupt)
+                log_disrupts.append(batch_disrupt.item())
                 self.callback.on_batch_end(None)
 
             # Log some values
