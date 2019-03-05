@@ -43,15 +43,52 @@ class EpisodeLogger(Callback):
 
     def on_epoch_begin(self, info=None):
         self.logger.info(f"Start of epoch: {info}")
+        self.log_entropies = []
+        self.log_values = []
+        self.log_policy_losses = []
+        self.log_value_losses = []
+        self.log_grad_norms = []
+        self.log_losses = []
+        self.log_disrupts = []
 
-    def on_epoch_end(self, info=None):
-        pass
+    def on_epoch_end(self, logs=None, info=None):
+        if logs is not None:
+            # Log some values
+            logs["entropy"] = np.mean(self.log_entropies)
+            logs["value"] = np.mean(self.log_values)
+            logs["policy_loss"] = np.mean(self.log_policy_losses)
+            logs["value_loss"] = np.mean(self.log_value_losses)
+            logs["grad_norm"] = np.mean(self.log_grad_norms)
+            logs["loss"] = np.mean(self.log_losses)
+            logs["disrupts"] = np.mean(self.log_disrupts)
+            return logs
+        else:
+            pass
 
     def on_batch_begin(self, batch, info=None):
-        pass
+        batch_entropy = 0
+        batch_value = 0
+        batch_policy_loss = 0
+        batch_value_loss = 0
+        batch_loss = 0
+        batch_disrupt = 0
+        return {
+            'entropy': batch_entropy,
+            'value': batch_value,
+            'policy_loss': batch_policy_loss,
+            'value_loss': batch_value_loss,
+            'loss': batch_loss,
+            'disrupt': batch_disrupt
+        }
 
-    def on_batch_end(self, batch, info=None):
-        pass
+    def on_batch_end(self, loss, info=None):
+        self.log_losses.append(loss.item())
+        self.log_entropies.append(info['entropy'])
+        self.log_values.append(info['value'])
+        self.log_policy_losses.append(info['policy_loss'])
+        self.log_value_losses.append(info['value_loss'])
+        self.log_disrupts.append(info['disrupt'].item())
+        self.log_grad_norms.append(info['grad_norm'].item())
 
     def on_train_begin(self, info=None):
         self.logger.info("Starting training")
@@ -108,6 +145,9 @@ class EpisodeLogger(Callback):
                 'train/succes_rate', success_per_episode['mean'], status['i'])
             self.writer.add_scalar('train/episode_length', num_frames_per_episode['mean'], status['i'])
             self.writer.add_scalar('train/disrupt', logs["disrupts"], status['i'])
+            self.writer.add_scalar('train/loss', logs["loss"], status['i'])
+            self.writer.add_scalar('train/policy_loss', logs["policy_loss"], status['i'])
+            self.writer.add_scalar('train/value_loss', logs["value_loss"], status['i'])
 
 
 def get_stats(arr):

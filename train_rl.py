@@ -114,7 +114,9 @@ def init_argparser():
     parser.add_argument('--explore_for', type=int, default=10,
                         help='Explore for amount of cycles (default: 10)')
     parser.add_argument('--disrupt', type=int, default=1,
-                        help="Add disruptiveness metric as multiplier to policy loss with the following settings:\n  0: log(sum(binary_diff)), clipped to [0.01, 5]\n")
+                        help="Add disruptiveness metric with the following semantics:\n\n\
+0: No disruptiveness\n\
+1: policy_loss * log(sum(binary_diff(s1,s2))), clipped to [0.01, 5]\n\n")
 
     # PPO arguments
     parser.add_argument('--gamma', type=float, default=0.99,

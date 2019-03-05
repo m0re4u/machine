@@ -226,26 +226,12 @@ class ReinforcementTrainer(object):
 
         Taken from babyAI repo
         """
-        e_i = 0
-        for _ in range(self.epochs):
+        for e_i in range(self.epochs):
             self.callback.on_epoch_begin(e_i)
-            # Initialize log values
-            log_entropies = []
-            log_values = []
-            log_policy_losses = []
-            log_value_losses = []
-            log_grad_norms = []
-            log_losses = []
-            log_disrupts = []
 
             for inds in self._get_batches_starting_indexes():
-                self.callback.on_batch_begin(None)
-                batch_entropy = 0
-                batch_value = 0
-                batch_policy_loss = 0
-                batch_value_loss = 0
+                batch_logs = self.callback.on_batch_begin(None)
                 batch_loss = 0
-                batch_disrupt = 0
 
                 memory = exps.memory[inds]
 
@@ -260,14 +246,12 @@ class ReinforcementTrainer(object):
                     memory = model_results['memory']
 
                     disrupt_val = torch.tensor(1)
-                    if i < self.recurrence - 1 and self.disrupt_mode < 2:
+                    if i < self.recurrence - 1 and self.disrupt_mode == 1:
                         s1 = sb.obs.image
                         s2 = exps[inds + i + 1].obs.image
                         disrupt_val = torch.sum(s1 != s2, dtype=torch.float)
-                        if self.disrupt_mode == 0:
-                            disrupt_val = torch.log(disrupt_val)
-                            disrupt_val = torch.clamp(disrupt_val, min=.01, max=5)
-
+                        disrupt_val = torch.log(disrupt_val)
+                        disrupt_val = torch.clamp(disrupt_val, min=.01, max=5)
 
                     entropy = dist.entropy().mean()
                     ratio = torch.exp(dist.log_prob(
@@ -284,28 +268,32 @@ class ReinforcementTrainer(object):
                     surr2 = (value_clipped - sb.returnn).pow(2)
                     value_loss = torch.max(surr1, surr2).mean()
 
-                    loss = (policy_loss  * disrupt_val) - self.entropy_coef * \
+                    loss = (policy_loss * disrupt_val) - self.entropy_coef * \
                         entropy + (self.value_loss_coef * value_loss)
 
-                    # Update batch values
-                    batch_entropy += entropy.item()
-                    batch_value += value.mean().item()
-                    batch_policy_loss += policy_loss.item()
-                    batch_value_loss += value_loss.item()
+                    # Update loss
                     batch_loss += loss
-                    batch_disrupt += disrupt_val
+
+                    # Update batch logging values
+                    batch_logs['entropy'] += entropy.item()
+                    batch_logs['value'] += value.mean().item()
+                    batch_logs['policy_loss'] += policy_loss.item()
+                    batch_logs['value_loss'] += value_loss.item()
+                    batch_logs['disrupt'] += disrupt_val
 
                     # Update memories for next epoch
                     if i < self.recurrence - 1:
                         exps.memory[inds + i + 1] = memory.detach()
 
-                # Update batch values
-                batch_entropy /= self.recurrence
-                batch_value /= self.recurrence
-                batch_policy_loss /= self.recurrence
-                batch_value_loss /= self.recurrence
+                # Update loss
                 batch_loss /= self.recurrence
-                batch_disrupt /= self.recurrence
+
+                # Update batch logging values
+                batch_logs['entropy'] /= self.recurrence
+                batch_logs['value'] /= self.recurrence
+                batch_logs['policy_loss'] /= self.recurrence
+                batch_logs['value_loss'] /= self.recurrence
+                batch_logs['disrupt'] /= self.recurrence
 
                 # Update actor-critic
                 self.optimizer.zero_grad()
@@ -317,25 +305,10 @@ class ReinforcementTrainer(object):
                 self.optimizer.step()
 
                 # Update log values
-                log_entropies.append(batch_entropy)
-                log_values.append(batch_value)
-                log_policy_losses.append(batch_policy_loss)
-                log_value_losses.append(batch_value_loss)
-                log_grad_norms.append(grad_norm.item())
-                log_losses.append(batch_loss.item())
-                log_disrupts.append(batch_disrupt.item())
-                self.callback.on_batch_end(None)
+                batch_logs['grad_norm'] = grad_norm
+                self.callback.on_batch_end(batch_loss, batch_logs)
 
-            # Log some values
-            logs["entropy"] = numpy.mean(log_entropies)
-            logs["value"] = numpy.mean(log_values)
-            logs["policy_loss"] = numpy.mean(log_policy_losses)
-            logs["value_loss"] = numpy.mean(log_value_losses)
-            logs["grad_norm"] = numpy.mean(log_grad_norms)
-            logs["loss"] = numpy.mean(log_losses)
-            logs["disrupts"] = numpy.mean(log_disrupts)
-            e_i += 1
-            self.callback.on_epoch_end()
+            logs = self.callback.on_epoch_end(logs)
         return logs
 
     def train(self):
