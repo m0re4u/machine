@@ -81,7 +81,7 @@ def init_argparser():
                         help='Name of the environment to use')
     parser.add_argument('--lr', type=float, help='Learning rate. Recommended settings:\n  adam=0.001\n  adadelta=1.0\n  adamax=0.002\n  rmsprop=0.01\n  sgd=0.1\n  (default: 0.0001)',
                         default=0.0001)
-    parser.add_argument('--num-processes', type=int, default=16,
+    parser.add_argument('--num-processes', type=int, default=64,
                         help='how many training CPU processes to use (default: 16)')
     parser.add_argument('--batch_size', type=int, default=1280,
                         help='number of batches for ppo (default: 1280)')

@@ -251,7 +251,7 @@ class ReinforcementTrainer(object):
                         s2 = exps[inds + i + 1].obs.image
                         disrupt_val = torch.sum(s1 != s2, dtype=torch.float)
                         disrupt_val = torch.log(disrupt_val)
-                        disrupt_val = torch.clamp(disrupt_val, min=.01, max=5)
+                        disrupt_val = torch.clamp(disrupt_val, min=.01, max=10)
 
                     entropy = dist.entropy().mean()
                     ratio = torch.exp(dist.log_prob(
