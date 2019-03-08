@@ -12,5 +12,5 @@ python3 train_rl.py \
     --env-name BabyAI-GoToLocal-v0 \
     --print_every 1 \
     --disrupt 1 \
-    --slurm_id $SLURM_JOB_ID
+    --slurm_id $SLURM_JOB_ID \
     --tb
