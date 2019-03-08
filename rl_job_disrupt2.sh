@@ -11,6 +11,6 @@ pushd ${HOME}/machine/
 python3 train_rl.py \
     --env-name BabyAI-GoToLocal-v0 \
     --print_every 1 \
-    --disrupt 1 \
+    --disrupt 2 \
     --slurm_id $SLURM_JOB_ID
     --tb
