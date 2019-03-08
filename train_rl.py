@@ -39,16 +39,16 @@ def train_model():
     suffix = datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")
     instr = opt.instr_arch if opt.instr_arch else "noinstr"
     mem = "mem" if not opt.no_mem else "nomem"
+    jobid = f'_job{opt.slurm_id}' if opt.slurm_id != 0 else ''
     model_name_parts = {
         'env': opt.env_name,
         'arch': opt.arch,
         'instr': instr,
         'mem': mem,
         'seed': opt.seed,
-        'info': '',
-        'coef': '',
+        'jobid': jobid,
         'suffix': suffix}
-    model_name = "{env}_{arch}_{instr}_{mem}_seed{seed}{info}{coef}_{suffix}".format(
+    model_name = "{env}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(
         **model_name_parts)
 
     # Prepare model
@@ -165,6 +165,8 @@ def init_argparser():
                         help='Logging level.', default='info', choices=['info','debug','warning','error','notset','critical'])
     parser.add_argument('--cuda_device', default=0,
                         type=int, help='set cuda device to use')
+    parser.add_argument('--slurm_id', default=0,
+                        type=int, help='Get the SLURM job id if we\'re running on LISA')
 
     return parser
 

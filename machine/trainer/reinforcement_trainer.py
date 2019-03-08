@@ -95,6 +95,8 @@ class ReinforcementTrainer(object):
             self.batch_num = 0
             self.epochs = opt.ppo_epochs
 
+        self.logger.info(f"Setup {self._trainer}, with model_name: {model_name}")
+
     def collect_experiences(self):
         """
         Collect actions, observations and rewards over multiple concurrent
