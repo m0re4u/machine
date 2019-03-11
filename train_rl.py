@@ -114,8 +114,8 @@ def init_argparser():
     parser.add_argument('--disrupt', type=int, default=0,
                         help="Add disruptiveness metric with the following semantics:\n\n\
 0: No disruptiveness\n\
-1: policy_loss * log(sum(binary_diff(s1,s2))), clipped to [0.01, 5]\n\
-2: value_loss * log(sum(binary_diff(s1,s2))), clipped to [0.01, 5]\n\n")
+1: policy_loss * log(sum(binary_diff(s1,s2))), clipped to [0.01, 10]\n\
+2: value_loss * log(sum(binary_diff(s1,s2))), clipped to [0.01, 10]\n\n")
 
     # PPO arguments
     parser.add_argument('--gamma', type=float, default=0.99,
