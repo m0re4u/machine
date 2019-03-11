@@ -248,8 +248,7 @@ class ReinforcementTrainer(object):
                     value = model_results['value']
                     memory = model_results['memory']
 
-                    disrupt_val_policy = torch.tensor(1)
-                    disrupt_val_value = torch.tensor(1)
+                    disrupt_val = torch.tensor(1)
                     if i < self.recurrence - 1:
                         if self.disrupt_mode > 0:
                             s1 = sb.obs.image
@@ -258,10 +257,6 @@ class ReinforcementTrainer(object):
                             disrupt_val = torch.log(disrupt_val)
                             disrupt_val = torch.clamp(disrupt_val, min=.01, max=10)
                             disrupt_val *= self.disrupt_coef
-                            if self.disrupt_mode == 1:
-                                disrupt_val_policy = disrupt_val
-                            elif self.disrupt_mode == 2:
-                                disrupt_val_value = disrupt_val
 
                     entropy = dist.entropy().mean()
                     ratio = torch.exp(dist.log_prob(
@@ -278,8 +273,15 @@ class ReinforcementTrainer(object):
                     surr2 = (value_clipped - sb.returnn).pow(2)
                     value_loss = torch.max(surr1, surr2).mean()
 
-                    loss = (policy_loss * disrupt_val_policy) - self.entropy_coef * \
-                        entropy + (self.value_loss_coef * (value_loss * disrupt_val_value))
+                    if self.disrupt_mode == 1:
+                        loss = (policy_loss * disrupt_val) - self.entropy_coef * \
+                            entropy + (self.value_loss_coef * value_loss)
+                    elif self.disrupt_mode == 2:
+                        loss = policy_loss - self.entropy_coef * \
+                            entropy + (self.value_loss_coef * (value_loss * disrupt_val))
+                    else:
+                        loss = policy_loss - self.entropy_coef * \
+                            entropy + (self.value_loss_coef * value_loss)
 
                     # Update loss
                     batch_loss += loss

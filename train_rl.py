@@ -111,7 +111,7 @@ def init_argparser():
     # Curiosity arguments
     parser.add_argument('--explore_for', type=int, default=10,
                         help='Explore for amount of cycles (default: 10)')
-    parser.add_argument('--disrupt_coeff', type=float, default=1.0,
+    parser.add_argument('--disrupt_coef', type=float, default=1.0,
                         help='Multiply the disruptiveness metric with this value (default: 1.0)')
     parser.add_argument('--disrupt', type=int, default=0,
                         help="Add disruptiveness metric with the following semantics:\n\n\
