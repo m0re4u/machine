@@ -2,7 +2,7 @@
 #SBATCH -N 1
 #SBATCH -p gpu_shared
 #SBATCH -t 12:00:00
-#SBATCH -mem=12GB
+#SBATCH --mem=12GB
 
 #SBATCH --mail-type=END
 #SBATCH --mail-user=michiel.vandermeer@student.uva.nl
