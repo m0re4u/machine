@@ -87,6 +87,7 @@ class ReinforcementTrainer(object):
         self.disrupt_fn = FrobeniusNorm(binary=True)
         self.explore_for = opt.explore_for
         self.disrupt_mode = opt.disrupt
+        self.disrupt_coef = opt.disrupt_coef
 
         if algo_name == 'ppo':
             assert opt.batch_size % opt.recurrence == 0
@@ -256,6 +257,7 @@ class ReinforcementTrainer(object):
                             disrupt_val = torch.sum(s1 != s2, dtype=torch.float)
                             disrupt_val = torch.log(disrupt_val)
                             disrupt_val = torch.clamp(disrupt_val, min=.01, max=10)
+                            disrupt_val *= self.disrupt_coef
                             if self.disrupt_mode == 1:
                                 disrupt_val_policy = disrupt_val
                             elif self.disrupt_mode == 2:
@@ -325,7 +327,6 @@ class ReinforcementTrainer(object):
         """
         # Start training model
         self.callback.on_train_begin()
-        total_start_time = time.time()
         self.status = {
             'i': 0,
             'num_frames': 0,
