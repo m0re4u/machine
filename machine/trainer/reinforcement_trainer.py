@@ -64,7 +64,8 @@ class ReinforcementTrainer(object):
         self.init_log_vars()
 
         # Initialize callbacks
-        self.callback = EpisodeLogger(opt.print_every, opt.save_every, model_name, opt.tb)
+        self.callback = EpisodeLogger(
+            opt.print_every, opt.save_every, model_name, opt.tb, opt.explore_for)
         self.callback.set_trainer(self)
 
         # Set parameters for specific algorithms
@@ -81,12 +82,17 @@ class ReinforcementTrainer(object):
 
         self.logger.info(f"Setup {self._trainer}, with model_name: {model_name}")
 
-    def collect_experiences(self):
+    def collect_experiences(self, intrinsic_reward=False):
         """
         Collect actions, observations and rewards over multiple concurrent
         environments.
 
         Taken from babyAI repo
+
+        Args:
+            intrinsic_reward (bool): Whether to use intrinsic motivation, in
+                the form of the disruptiveness metric. If False, get reward
+                from the environment and compute advantage.
         """
         for i in range(self.frames_per_proc):
             # Do one agent-environment interaction
@@ -111,7 +117,10 @@ class ReinforcementTrainer(object):
             self.update_log_values(i, dist, action, reward, done)
 
         # Add advantage and return to experiences
-        self.compute_advantage()
+        if intrinsic_reward:
+            self.compute_disruptiveness()
+        else:
+            self.compute_advantage()
 
         # Flatten the data correctly, making sure that each episode's data is
         # a continuous chunk.
@@ -236,7 +245,7 @@ class ReinforcementTrainer(object):
             self.callback.on_cycle_start()
 
             # Create experiences and update the training status
-            exps, logs = self.collect_experiences()
+            exps, logs = self.collect_experiences(intrinsic_reward=(num_frames < self.explore_for))
 
             # Use experience to update policy
             logs = self.update_model_parameters(exps, logs)
@@ -248,14 +257,12 @@ class ReinforcementTrainer(object):
 
     def init_experience_matrices(self):
         """
-        TODO
+        Initialize matrices used in the storing of observations.
         """
         shape = (self.frames_per_proc, self.num_procs)
 
-        self.memory = torch.zeros(
-            shape[1], self.model.memory_size, device=device)
-        self.memories = torch.zeros(
-            *shape, self.model.memory_size, device=device)
+        self.memory = torch.zeros(shape[1], self.model.memory_size, device=device)
+        self.memories = torch.zeros(*shape, self.model.memory_size, device=device)
 
         self.mask = torch.ones(shape[1], device=device)
         self.masks = torch.zeros(*shape, device=device)
@@ -267,7 +274,7 @@ class ReinforcementTrainer(object):
 
     def init_log_vars(self):
         """
-        TODO
+        Initialize the variables used for logging training progress.
         """
         self.log_episode_return = torch.zeros(self.num_procs, device=device)
         self.log_episode_reshaped_return = torch.zeros(self.num_procs, device=device)
@@ -280,7 +287,7 @@ class ReinforcementTrainer(object):
 
     def update_memory(self, i, action, value, obs, reward, done):
         """
-        TODO
+        Update the memory matrices based on agent-environment interaction.
         """
         self.obss[i] = self.obs
         self.memories[i] = self.memory
@@ -297,7 +304,7 @@ class ReinforcementTrainer(object):
 
     def update_log_values(self, i, dist, action, reward, done):
         """
-        TODO
+        Update the logging values used for keeping track of training progress.
         """
         self.log_probs[i] = dist.log_prob(action)
         self.log_episode_return += torch.tensor(reward, device=device, dtype=torch.float)
@@ -317,7 +324,13 @@ class ReinforcementTrainer(object):
 
     def compute_advantage(self):
         """
-        TODO
+        Run the advantage estimation from [1].
+
+        A_t = delta_t + (gamma * lambda) delta_(t+1) ...
+            with
+        delta_t = reward_t + gamma V(s_(t+1)) - V(s_t)
+
+        [1]: Mnih et al. (2016) "Asynchronous methods for deep reinforcement learning"
         """
         preprocessed_obs = self.preprocess_obss(self.obs, device=device)
         with torch.no_grad():
@@ -332,9 +345,28 @@ class ReinforcementTrainer(object):
             delta = self.rewards[i] + self.discount * next_value * next_mask - self.values[i]
             self.advantages[i] = delta + self.discount * self.gae_lambda * next_advantage * next_mask
 
+    def compute_disruptiveness(self):
+        """
+        Compute an intrinsic reward based on the disruptiveness metric.
+        """
+        preprocessed_obs = self.preprocess_obss(self.obs, device=device)
+        with torch.no_grad():
+            next_value = self.model(
+                preprocessed_obs, self.memory * self.mask.unsqueeze(1))['value']
+
+        for i in range(self.frames_per_proc):
+            s_t = self.obss[i]
+            s_t1 = self.obss[i+1] if i < (self.frames_per_proc - 1) else self.obs
+
+            # Binary difference
+            state_t = torch.Tensor([s['image'] for s in s_t])
+            state_t1 = torch.Tensor([s['image'] for s in s_t1])
+            self.advantages[i] = torch.nonzero(state_t - state_t1).size()[0]
+
     def flatten_data(self):
         """
-        TODO
+        Flatten the memory such that it is a continuous chunk of data. This is
+        required by the PyTorch optimization step.
         """
         exps = DictList()
         exps.obs = [self.obss[i][j]
@@ -362,7 +394,7 @@ class ReinforcementTrainer(object):
 
     def log_output(self):
         """
-        TODO
+        Create logging output based on the observed training progress.
         """
         keep = max(self.log_done_counter, self.num_procs)
         log = {
@@ -380,7 +412,8 @@ class ReinforcementTrainer(object):
         return log
 
     def _get_batches_starting_indexes(self):
-        """Gives, for each batch, the indexes of the observations given to
+        """
+        Gives, for each batch, the indexes of the observations given to
         the model and the experiences used to compute the loss at first.
         Returns
         -------

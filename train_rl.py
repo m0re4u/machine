@@ -55,8 +55,8 @@ def train_model():
     obss_preprocessor = babyai.utils.ObssPreprocessor(
         model_name, envs[0].observation_space, None)
     acmodel = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                                   opt.image_dim, opt.memory_dim, opt.instr_dim,
-                                   not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+                      opt.image_dim, opt.memory_dim, opt.instr_dim,
+                      not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
 
     obss_preprocessor.vocab.save()
 
@@ -74,7 +74,8 @@ def train_model():
 
 
 def init_argparser():
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter)
 
     # Training algorithm arguments
     parser.add_argument('--env-name', required=True,
@@ -109,8 +110,8 @@ def init_argparser():
                         help="beta2 for Adam (default: 0.999)")
 
     # Curiosity arguments
-    parser.add_argument('--explore_for', type=int, default=10,
-                        help='Explore for amount of cycles (default: 10)')
+    parser.add_argument('--explore_for', type=int, default=0,
+                        help='Explore for amount of cycles (default: 0)')
     parser.add_argument('--disrupt_coef', type=float, default=1.0,
                         help='Multiply the disruptiveness metric with this value (default: 1.0)')
     parser.add_argument('--disrupt', type=int, default=0,
@@ -165,7 +166,7 @@ def init_argparser():
     parser.add_argument('--output_dir', default='models',
                         help='Path to output model directory to save checkpoints in.')
     parser.add_argument('--log-level',
-                        help='Logging level.', default='info', choices=['info','debug','warning','error','notset','critical'])
+                        help='Logging level.', default='info', choices=['info', 'debug', 'warning', 'error', 'notset', 'critical'])
     parser.add_argument('--cuda_device', default=0,
                         type=int, help='set cuda device to use')
     parser.add_argument('--slurm_id', default=0,
@@ -176,7 +177,8 @@ def init_argparser():
 
 def validate_options(parser, opt):
     if opt.resume and not opt.load_checkpoint:
-        parser.error("load_checkpoint argument is required to resume training from checkpoint")
+        parser.error(
+            "load_checkpoint argument is required to resume training from checkpoint")
 
     if torch.cuda.is_available():
         logging.info(f"CUDA device set to {opt.cuda_device}")
@@ -198,6 +200,7 @@ def validate_options(parser, opt):
 def init_logging(level):
     logging.basicConfig(format=LOG_FORMAT, level=getattr(
         logging, level.upper()))
+
 
 if __name__ == "__main__":
     train_model()

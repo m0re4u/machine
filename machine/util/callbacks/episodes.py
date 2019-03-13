@@ -22,7 +22,7 @@ class EpisodeLogger(Callback):
         - batch: Batches in update_parameters()
     """
 
-    def __init__(self, print_every=10, save_every=10, model_name='', use_tensorboard=False):
+    def __init__(self, print_every=10, save_every=10, model_name='', use_tensorboard=False, explore_for=100):
         super(EpisodeLogger, self).__init__()
 
         self.logger = logging.getLogger("EpisodeLogger")
@@ -41,6 +41,7 @@ class EpisodeLogger(Callback):
         self.cycle = 0
         self.num_frames = 0
         self.num_episodes = 0
+        self.explore_for = explore_for
 
     def set_trainer(self, trainer):
         self.trainer = trainer
@@ -105,6 +106,8 @@ class EpisodeLogger(Callback):
 
     def on_cycle_start(self):
         self.cycle_start_time = time.time()
+        reward_origin = 'intrinsic' if self.num_frames < self.explore_for else 'advantage'
+        self.logger.info(f"Start of cycle: {self.cycle} - Reward from: {reward_origin}")
 
     def on_cycle_end(self, logs):
         self.num_frames += logs['num_frames']
