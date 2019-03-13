@@ -38,6 +38,10 @@ class EpisodeLogger(Callback):
         else:
             self.writer = None
 
+        self.cycle = 0
+        self.num_frames = 0
+        self.num_episodes = 0
+
     def set_trainer(self, trainer):
         self.trainer = trainer
 
@@ -92,6 +96,9 @@ class EpisodeLogger(Callback):
 
     def on_train_begin(self, info=None):
         self.logger.info("Starting training")
+        self.cycle = 0
+        self.num_frames = 0
+        self.num_episodes = 0
 
     def on_train_end(self, info=None):
         self.logger.info("Finished training")
@@ -99,7 +106,10 @@ class EpisodeLogger(Callback):
     def on_cycle_start(self):
         self.cycle_start_time = time.time()
 
-    def on_cycle_end(self, status, logs):
+    def on_cycle_end(self, logs):
+        self.num_frames += logs['num_frames']
+        self.num_episodes += logs['episodes_done']
+        self.cycle += 1
         cycle_time = time.time() - self.cycle_start_time
         fps = logs['num_frames'] / cycle_time
         return_per_episode = get_stats(logs["return_per_episode"])
@@ -107,9 +117,9 @@ class EpisodeLogger(Callback):
             [1 if r > 0 else 0 for r in logs["return_per_episode"]])
         num_frames_per_episode = get_stats(logs["num_frames_per_episode"])
         data = [
-            status['i'],
-            status['num_episodes'],
-            status['num_frames'],
+            self.cycle,
+            self.num_episodes,
+            self.num_frames,
             fps,
             cycle_time,
             *return_per_episode.values(),
@@ -127,27 +137,27 @@ class EpisodeLogger(Callback):
                       "S {:.2f} | F:xsmM {:.1f} {:.1f} {} {} | H {:.3f} | V {:.3f} | "
                       "pL {: .3f} | vL {:.3f} | L {:.3f} | gN {:.3f} | ")
 
-        if status['i'] % self.print_every == 0:
+        if self.cycle % self.print_every == 0:
             self.logger.info(format_str.format(*data))
-        if status['i'] % self.save_every == 0:
+        if self.cycle % self.save_every == 0:
             check = RLCheckpoint(
                 self.trainer.model,
                 self.trainer.optimizer,
-                status,
+                {'i':self.cycle, 'num_frames':self.num_frames, 'num_episodes':self.num_episodes},
                 self.trainer.preprocess_obss,
                 self.trainer.model_path
             )
             check.save()
             self.trainer.preprocess_obss.vocab.save()
         if self.writer is not None:
-            self.writer.add_scalar('train/fps', fps, status['i'])
+            self.writer.add_scalar('train/fps', fps, self.cycle)
             self.writer.add_scalar(
-                'train/succes_rate', success_per_episode['mean'], status['i'])
-            self.writer.add_scalar('train/episode_length', num_frames_per_episode['mean'], status['i'])
-            self.writer.add_scalar('train/disrupt', logs["disrupts"], status['i'])
-            self.writer.add_scalar('train/loss', logs["loss"], status['i'])
-            self.writer.add_scalar('train/policy_loss', logs["policy_loss"], status['i'])
-            self.writer.add_scalar('train/value_loss', logs["value_loss"], status['i'])
+                'train/succes_rate', success_per_episode['mean'], self.cycle)
+            self.writer.add_scalar('train/episode_length', num_frames_per_episode['mean'], self.cycle)
+            self.writer.add_scalar('train/disrupt', logs["disrupts"], self.cycle)
+            self.writer.add_scalar('train/loss', logs["loss"], self.cycle)
+            self.writer.add_scalar('train/policy_loss', logs["policy_loss"], self.cycle)
+            self.writer.add_scalar('train/value_loss', logs["value_loss"], self.cycle)
 
 
 def get_stats(arr):

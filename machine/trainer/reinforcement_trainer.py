@@ -1,7 +1,5 @@
-import datetime
 import logging
 import os
-import time
 
 import numpy
 import torch
@@ -23,7 +21,7 @@ class ReinforcementTrainer(object):
     """
 
     def __init__(self, envs, opt, model, model_name, obs, reshape_reward, algo_name='ppo'):
-        self._trainer = "Reinforcement Trainer"
+        self._trainer = f"Reinforcement Trainer - algorithm: {algo_name}"
         self._algo = algo_name
         self.env = envs
         self.model = model
@@ -50,51 +48,36 @@ class ReinforcementTrainer(object):
         self.num_frames = self.frames_per_proc * self.num_procs
         assert self.frames_per_proc % opt.recurrence == 0
 
-        # Initialize experience matrices
-        shape = (self.frames_per_proc, self.num_procs)
-        self.obs = self.env.reset()
-        self.obss = [None]*(shape[0])
-
-        self.memory = torch.zeros(
-            shape[1], self.model.memory_size, device=device)
-        self.memories = torch.zeros(
-            *shape, self.model.memory_size, device=device)
-
-        self.mask = torch.ones(shape[1], device=device)
-        self.masks = torch.zeros(*shape, device=device)
-        self.actions = torch.zeros(*shape, device=device, dtype=torch.int)
-        self.values = torch.zeros(*shape, device=device)
-        self.rewards = torch.zeros(*shape, device=device)
-        self.advantages = torch.zeros(*shape, device=device)
-        self.log_probs = torch.zeros(*shape, device=device)
-
-        # Initialize log variables
-        self.log_episode_return = torch.zeros(self.num_procs, device=device)
-        self.log_episode_reshaped_return = torch.zeros(
-            self.num_procs, device=device)
-        self.log_episode_num_frames = torch.zeros(
-            self.num_procs, device=device)
-
-        self.callback = EpisodeLogger(
-            opt.print_every, opt.save_every, model_name, opt.tb)
-        self.callback.set_trainer(self)
-
-        self.log_done_counter = 0
-        self.log_return = [0] * self.num_procs
-        self.log_reshaped_return = [0] * self.num_procs
-        self.log_num_frames = [0] * self.num_procs
-
-        self.disrupt_fn = FrobeniusNorm(binary=True)
+        # Arguments for disruptiveness
         self.explore_for = opt.explore_for
         self.disrupt_mode = opt.disrupt
         self.disrupt_coef = opt.disrupt_coef
 
+        # Initialize experience matrices
+        self.init_experience_matrices()
+
+        # Initialize observations
+        self.obs = self.env.reset()
+        self.obss = [None] * self.frames_per_proc
+
+        # Initialize log variables
+        self.init_log_vars()
+
+        # Initialize callbacks
+        self.callback = EpisodeLogger(opt.print_every, opt.save_every, model_name, opt.tb)
+        self.callback.set_trainer(self)
+
+        # Set parameters for specific algorithms
         if algo_name == 'ppo':
             assert opt.batch_size % opt.recurrence == 0
             self.optimizer = torch.optim.Adam(self.model.parameters(
             ), self.lr, (opt.beta1, opt.beta2), eps=opt.optim_eps)
             self.batch_num = 0
             self.epochs = opt.ppo_epochs
+        elif algo_name == 'option_critic':
+            raise NotImplementedError("Option-Critic Network has not been implemented yet!")
+        else:
+            raise ValueError("Not a valid implemented RL algorithm!")
 
         self.logger.info(f"Setup {self._trainer}, with model_name: {model_name}")
 
@@ -109,8 +92,7 @@ class ReinforcementTrainer(object):
             # Do one agent-environment interaction
             preprocessed_obs = self.preprocess_obss(self.obs, device=device)
             with torch.no_grad():
-                model_results = self.model(
-                    preprocessed_obs, self.memory * self.mask.unsqueeze(1))
+                model_results = self.model(preprocessed_obs, self.memory * self.mask.unsqueeze(1))
                 dist = model_results['dist']
                 value = model_results['value']
                 memory = model_results['memory']
@@ -120,106 +102,23 @@ class ReinforcementTrainer(object):
             obs, reward, done, env_info = self.env.step(action.cpu().numpy())
 
             # Update experiences values
-            self.obss[i] = self.obs
+            self.update_memory(i, action, value, obs, reward, done)
             self.obs = obs
-
-            self.memories[i] = self.memory
             self.memory = memory
-
-            self.masks[i] = self.mask
-            self.mask = 1 - \
-                torch.tensor(done, device=device, dtype=torch.float)
-            self.actions[i] = action
-            self.values[i] = value
-            if self.reshape_reward is not None:
-                self.rewards[i] = torch.tensor([
-                    self.reshape_reward(obs_, action_, reward_, done_)
-                    for obs_, action_, reward_, done_ in zip(obs, action, reward, done)
-                ], device=device)
-            else:
-                self.rewards[i] = torch.tensor(reward, device=device)
-            self.log_probs[i] = dist.log_prob(action)
+            self.mask = 1 - torch.tensor(done, device=device, dtype=torch.float)
 
             # Update log values
-            self.log_episode_return += torch.tensor(
-                reward, device=device, dtype=torch.float)
-            self.log_episode_reshaped_return += self.rewards[i]
-            self.log_episode_num_frames += torch.ones(
-                self.num_procs, device=device)
-
-            for i, done_ in enumerate(done):
-                if done_:
-                    self.log_done_counter += 1
-                    self.log_return.append(self.log_episode_return[i].item())
-                    self.log_reshaped_return.append(
-                        self.log_episode_reshaped_return[i].item())
-                    self.log_num_frames.append(
-                        self.log_episode_num_frames[i].item())
-
-            self.log_episode_return *= self.mask
-            self.log_episode_reshaped_return *= self.mask
-            self.log_episode_num_frames *= self.mask
+            self.update_log_values(i, dist, action, reward, done)
 
         # Add advantage and return to experiences
-        preprocessed_obs = self.preprocess_obss(self.obs, device=device)
-        with torch.no_grad():
-            next_value = self.model(
-                preprocessed_obs, self.memory * self.mask.unsqueeze(1))['value']
+        self.compute_advantage()
 
-        for i in reversed(range(self.frames_per_proc)):
-            next_mask = self.masks[i +
-                                   1] if i < self.frames_per_proc - 1 else self.mask
-            next_value = self.values[i +
-                                     1] if i < self.frames_per_proc - 1 else next_value
-            next_advantage = self.advantages[i +
-                                             1] if i < self.frames_per_proc - 1 else 0
-
-            delta = self.rewards[i] + self.discount * \
-                next_value * next_mask - self.values[i]
-            self.advantages[i] = delta + self.discount * \
-                self.gae_lambda * next_advantage * next_mask
-
-        # Flatten the data correctly, making sure that
-        # each episode's data is a continuous chunk
-        exps = DictList()
-        exps.obs = [self.obss[i][j]
-                    for j in range(self.num_procs)
-                    for i in range(self.frames_per_proc)]
-        # In commments below T is self.frames_per_proc, P is self.num_procs,
-        # D is the dimensionality
-
-        # T x P x D -> P x T x D -> (P * T) x D
-        exps.memory = self.memories.transpose(
-            0, 1).reshape(-1, *self.memories.shape[2:])
-        # T x P -> P x T -> (P * T) x 1
-        exps.mask = self.masks.transpose(0, 1).reshape(-1).unsqueeze(1)
-
-        # for all tensors below, T x P -> P x T -> P * T
-        exps.action = self.actions.transpose(0, 1).reshape(-1)
-        exps.value = self.values.transpose(0, 1).reshape(-1)
-        exps.reward = self.rewards.transpose(0, 1).reshape(-1)
-        exps.advantage = self.advantages.transpose(0, 1).reshape(-1)
-        exps.returnn = exps.value + exps.advantage
-        exps.log_prob = self.log_probs.transpose(0, 1).reshape(-1)
-
-        # Preprocess experiences
-        exps.obs = self.preprocess_obss(exps.obs, device=device)
+        # Flatten the data correctly, making sure that each episode's data is
+        # a continuous chunk.
+        exps = self.flatten_data()
 
         # Log some values
-        keep = max(self.log_done_counter, self.num_procs)
-
-        log = {
-            "return_per_episode": self.log_return[-keep:],
-            "reshaped_return_per_episode": self.log_reshaped_return[-keep:],
-            "num_frames_per_episode": self.log_num_frames[-keep:],
-            "num_frames": self.num_frames,
-            "episodes_done": self.log_done_counter,
-        }
-
-        self.log_done_counter = 0
-        self.log_return = self.log_return[-self.num_procs:]
-        self.log_reshaped_return = self.log_reshaped_return[-self.num_procs:]
-        self.log_num_frames = self.log_num_frames[-self.num_procs:]
+        log = self.log_output()
 
         return exps, log
 
@@ -253,9 +152,11 @@ class ReinforcementTrainer(object):
                         if self.disrupt_mode > 0:
                             s1 = sb.obs.image
                             s2 = exps[inds + i + 1].obs.image
-                            disrupt_val = torch.sum(s1 != s2, dtype=torch.float)
+                            disrupt_val = torch.sum(
+                                s1 != s2, dtype=torch.float)
                             disrupt_val = torch.log(disrupt_val)
-                            disrupt_val = torch.clamp(disrupt_val, min=.01, max=10)
+                            disrupt_val = torch.clamp(
+                                disrupt_val, min=.01, max=10)
                             disrupt_val *= self.disrupt_coef
 
                     entropy = dist.entropy().mean()
@@ -278,7 +179,8 @@ class ReinforcementTrainer(object):
                             entropy + (self.value_loss_coef * value_loss)
                     elif self.disrupt_mode == 2:
                         loss = policy_loss - self.entropy_coef * \
-                            entropy + (self.value_loss_coef * (value_loss * disrupt_val))
+                            entropy + (self.value_loss_coef *
+                                       (value_loss * disrupt_val))
                     else:
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef * value_loss)
@@ -329,12 +231,8 @@ class ReinforcementTrainer(object):
         """
         # Start training model
         self.callback.on_train_begin()
-        self.status = {
-            'i': 0,
-            'num_frames': 0,
-            'num_episodes': 0
-        }
-        while self.status['num_frames'] < self.frames:
+        num_frames = 0
+        while num_frames < self.frames:
             self.callback.on_cycle_start()
 
             # Create experiences and update the training status
@@ -343,12 +241,143 @@ class ReinforcementTrainer(object):
             # Use experience to update policy
             logs = self.update_model_parameters(exps, logs)
 
-            self.status['num_frames'] += logs['num_frames']
-            self.status['num_episodes'] += logs['episodes_done']
-            self.status['i'] += 1
-            self.callback.on_cycle_end(self.status, logs)
+            num_frames += logs['num_frames']
+            self.callback.on_cycle_end(logs)
 
         self.callback.on_train_end()
+
+    def init_experience_matrices(self):
+        """
+        TODO
+        """
+        shape = (self.frames_per_proc, self.num_procs)
+
+        self.memory = torch.zeros(
+            shape[1], self.model.memory_size, device=device)
+        self.memories = torch.zeros(
+            *shape, self.model.memory_size, device=device)
+
+        self.mask = torch.ones(shape[1], device=device)
+        self.masks = torch.zeros(*shape, device=device)
+        self.actions = torch.zeros(*shape, device=device, dtype=torch.int)
+        self.values = torch.zeros(*shape, device=device)
+        self.rewards = torch.zeros(*shape, device=device)
+        self.advantages = torch.zeros(*shape, device=device)
+        self.log_probs = torch.zeros(*shape, device=device)
+
+    def init_log_vars(self):
+        """
+        TODO
+        """
+        self.log_episode_return = torch.zeros(self.num_procs, device=device)
+        self.log_episode_reshaped_return = torch.zeros(self.num_procs, device=device)
+        self.log_episode_num_frames = torch.zeros(self.num_procs, device=device)
+
+        self.log_done_counter = 0
+        self.log_return = [0] * self.num_procs
+        self.log_reshaped_return = [0] * self.num_procs
+        self.log_num_frames = [0] * self.num_procs
+
+    def update_memory(self, i, action, value, obs, reward, done):
+        """
+        TODO
+        """
+        self.obss[i] = self.obs
+        self.memories[i] = self.memory
+        self.masks[i] = self.mask
+        self.actions[i] = action
+        self.values[i] = value
+        if self.reshape_reward is not None:
+            self.rewards[i] = torch.tensor([
+                self.reshape_reward(obs_, action_, reward_, done_)
+                for obs_, action_, reward_, done_ in zip(obs, action, reward, done)
+            ], device=device)
+        else:
+            self.rewards[i] = torch.tensor(reward, device=device)
+
+    def update_log_values(self, i, dist, action, reward, done):
+        """
+        TODO
+        """
+        self.log_probs[i] = dist.log_prob(action)
+        self.log_episode_return += torch.tensor(reward, device=device, dtype=torch.float)
+        self.log_episode_reshaped_return += self.rewards[i]
+        self.log_episode_num_frames += torch.ones(self.num_procs, device=device)
+
+        for j, done_ in enumerate(done):
+            if done_:
+                self.log_done_counter += 1
+                self.log_return.append(self.log_episode_return[j].item())
+                self.log_reshaped_return.append(self.log_episode_reshaped_return[j].item())
+                self.log_num_frames.append(self.log_episode_num_frames[j].item())
+
+        self.log_episode_return *= self.mask
+        self.log_episode_reshaped_return *= self.mask
+        self.log_episode_num_frames *= self.mask
+
+    def compute_advantage(self):
+        """
+        TODO
+        """
+        preprocessed_obs = self.preprocess_obss(self.obs, device=device)
+        with torch.no_grad():
+            next_value = self.model(
+                preprocessed_obs, self.memory * self.mask.unsqueeze(1))['value']
+
+        for i in reversed(range(self.frames_per_proc)):
+            next_mask = self.masks[i + 1] if i < self.frames_per_proc - 1 else self.mask
+            next_value = self.values[i + 1] if i < self.frames_per_proc - 1 else next_value
+            next_advantage = self.advantages[i + 1] if i < self.frames_per_proc - 1 else 0
+
+            delta = self.rewards[i] + self.discount * next_value * next_mask - self.values[i]
+            self.advantages[i] = delta + self.discount * self.gae_lambda * next_advantage * next_mask
+
+    def flatten_data(self):
+        """
+        TODO
+        """
+        exps = DictList()
+        exps.obs = [self.obss[i][j]
+                    for j in range(self.num_procs)
+                    for i in range(self.frames_per_proc)]
+        # In commments below T is self.frames_per_proc, P is self.num_procs,
+        # D is the dimensionality
+        # T x P x D -> P x T x D -> (P * T) x D
+        exps.memory = self.memories.transpose(
+            0, 1).reshape(-1, *self.memories.shape[2:])
+        # T x P -> P x T -> (P * T) x 1
+        exps.mask = self.masks.transpose(0, 1).reshape(-1).unsqueeze(1)
+
+        # for all tensors below, T x P -> P x T -> P * T
+        exps.action = self.actions.transpose(0, 1).reshape(-1)
+        exps.value = self.values.transpose(0, 1).reshape(-1)
+        exps.reward = self.rewards.transpose(0, 1).reshape(-1)
+        exps.advantage = self.advantages.transpose(0, 1).reshape(-1)
+        exps.returnn = exps.value + exps.advantage
+        exps.log_prob = self.log_probs.transpose(0, 1).reshape(-1)
+
+        # Preprocess experiences
+        exps.obs = self.preprocess_obss(exps.obs, device=device)
+        return exps
+
+    def log_output(self):
+        """
+        TODO
+        """
+        keep = max(self.log_done_counter, self.num_procs)
+        log = {
+            "return_per_episode": self.log_return[-keep:],
+            "reshaped_return_per_episode": self.log_reshaped_return[-keep:],
+            "num_frames_per_episode": self.log_num_frames[-keep:],
+            "num_frames": self.num_frames,
+            "episodes_done": self.log_done_counter,
+        }
+
+        self.log_done_counter = 0
+        self.log_return = self.log_return[-self.num_procs:]
+        self.log_reshaped_return = self.log_reshaped_return[-self.num_procs:]
+        self.log_num_frames = self.log_num_frames[-self.num_procs:]
+        return log
 
     def _get_batches_starting_indexes(self):
         """Gives, for each batch, the indexes of the observations given to
