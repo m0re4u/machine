@@ -75,8 +75,8 @@ class ReinforcementTrainer(object):
             ), self.lr, (opt.beta1, opt.beta2), eps=opt.optim_eps)
             self.batch_num = 0
             self.epochs = opt.ppo_epochs
-        elif algo_name == 'option_critic':
-            raise NotImplementedError("Option-Critic Network has not been implemented yet!")
+            # Option-Critic switch for PPO
+            self.oc = opt.oc
         else:
             raise ValueError("Not a valid implemented RL algorithm!")
 

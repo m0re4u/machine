@@ -136,6 +136,10 @@ def init_argparser():
     parser.add_argument('--ppo-epochs', type=int, default=4,
                         help='Number of epochs (default: 4)')
 
+    # Option-Critic arguments
+    parser.add_argument('--oc', action='store_true',
+                        help='Enable option-critic version of ppo')
+
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
                         help="dimensionality of the image embedding")
