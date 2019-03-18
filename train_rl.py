@@ -9,7 +9,7 @@ import torch
 
 import babyai
 from machine.trainer import ReinforcementTrainer
-from machine.models import ACModel
+from machine.models import ACModel, OCModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -36,38 +36,32 @@ def train_model():
         envs.append(env)
 
     # Create model name
-    suffix = datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")
-    instr = opt.instr_arch if opt.instr_arch else "noinstr"
-    mem = "mem" if not opt.no_mem else "nomem"
-    jobid = f'_job{opt.slurm_id}' if opt.slurm_id != 0 else ''
-    model_name_parts = {
-        'env': opt.env_name,
-        'arch': opt.arch,
-        'instr': instr,
-        'mem': mem,
-        'seed': opt.seed,
-        'jobid': jobid,
-        'suffix': suffix}
-    model_name = "{env}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(
-        **model_name_parts)
+    model_name = get_model_name(opt)
 
-    # Prepare model
+    # Observation preprocessor
     obss_preprocessor = babyai.utils.ObssPreprocessor(
         model_name, envs[0].observation_space, None)
-    acmodel = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                      opt.image_dim, opt.memory_dim, opt.instr_dim,
-                      not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+
+    if opt.oc:
+        # Option-Critic Model
+        model = OCModel(obss_preprocessor.obs_space, envs[0].action_space,
+                        opt.image_dim, opt.memory_dim, opt.instr_dim,
+                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+    else:
+        # Actor-Critic Model
+        model = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                        opt.image_dim, opt.memory_dim, opt.instr_dim,
+                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
 
     obss_preprocessor.vocab.save()
-
     if torch.cuda.is_available():
-        acmodel.cuda()
+        model.cuda()
 
     def reshape_reward(_0, _1, reward, _2): return opt.reward_scale * reward
     # Prepare trainer
     from babyai.rl.utils import ParallelEnv
     trainer = ReinforcementTrainer(ParallelEnv(
-        envs), opt, acmodel, model_name, obss_preprocessor, reshape_reward, 'ppo')
+        envs), opt, model, model_name, obss_preprocessor, reshape_reward, 'ppo')
 
     # Start training
     trainer.train()
@@ -202,8 +196,26 @@ def validate_options(parser, opt):
 
 
 def init_logging(level):
-    logging.basicConfig(format=LOG_FORMAT, level=getattr(
-        logging, level.upper()))
+    logging.basicConfig(format=LOG_FORMAT,
+                        level=getattr(logging, level.upper()))
+
+
+def get_model_name(opt):
+    suffix = datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")
+    instr = opt.instr_arch if opt.instr_arch else "noinstr"
+    mem = "mem" if not opt.no_mem else "nomem"
+    mod = "ACModel" if not opt.oc else "OCModel"
+    jobid = f'_job{opt.slurm_id}' if opt.slurm_id != 0 else ''
+    model_name_parts = {
+        'mod': mod,
+        'env': opt.env_name,
+        'arch': opt.arch,
+        'instr': instr,
+        'mem': mem,
+        'seed': opt.seed,
+        'jobid': jobid,
+        'suffix': suffix}
+    return "{env}_{mod}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
 
 
 if __name__ == "__main__":
