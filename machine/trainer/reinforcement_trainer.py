@@ -40,6 +40,8 @@ class ReinforcementTrainer(object):
         self.gae_lambda = opt.gae_lambda
         self.recurrence = opt.recurrence
         self.batch_size = opt.batch_size
+        assert opt.batch_size % opt.recurrence == 0
+
         self.clip_eps = opt.clip_eps
         self.entropy_coef = opt.entropy_coef
         self.value_loss_coef = opt.value_loss_coef
@@ -70,13 +72,12 @@ class ReinforcementTrainer(object):
 
         # Set parameters for specific algorithms
         if algo_name == 'ppo':
-            assert opt.batch_size % opt.recurrence == 0
             self.optimizer = torch.optim.Adam(self.model.parameters(
             ), self.lr, (opt.beta1, opt.beta2), eps=opt.optim_eps)
-            self.batch_num = 0
             self.epochs = opt.ppo_epochs
-            # Option-Critic switch for PPO
-            self.oc = opt.oc
+        elif algo_name == 'ppoc':
+            self.optimizer = torch.optim.RMSprop(self.model.parameters(), self.lr)
+            self.epochs = opt.ppo_epochs
         else:
             raise ValueError("Not a valid implemented RL algorithm!")
 
