@@ -7,3 +7,5 @@ from .baseModel import BaseModel
 from .LanguageModel import LanguageModel
 from .ACModel import ACModel, FiLMedBlock
 from .OCModel import OCModel
+from .SoftmaxPolicy import SoftmaxPolicy
+from .SigmoidTermination import SigmoidTermination

@@ -109,10 +109,12 @@ class EpisodeLogger(Callback):
         reward_origin = 'intrinsic' if self.num_frames < self.explore_for else 'advantage'
         self.logger.info(f"Start of cycle: {self.cycle} - Reward from: {reward_origin}")
 
-    def on_cycle_end(self, logs):
+    def on_cycle_end(self, logs=None):
+        self.cycle += 1
+        if logs is None:
+            return
         self.num_frames += logs['num_frames']
         self.num_episodes += logs['episodes_done']
-        self.cycle += 1
         cycle_time = time.time() - self.cycle_start_time
         fps = logs['num_frames'] / cycle_time
         return_per_episode = get_stats(logs["return_per_episode"])

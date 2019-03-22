@@ -8,7 +8,7 @@ import gym
 import torch
 
 import babyai
-from machine.trainer import ReinforcementTrainer
+from machine.trainer import ReinforcementTrainer, OptionTrainer
 from machine.models import ACModel, OCModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -42,34 +42,32 @@ def train_model():
     obss_preprocessor = babyai.utils.ObssPreprocessor(
         model_name, envs[0].observation_space, None)
 
-    if opt.oc:
-        # Option-Critic Model
-        model = OCModel(obss_preprocessor.obs_space, envs[0].action_space,
-                        opt.image_dim, opt.memory_dim, opt.instr_dim,
-                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
-    else:
-        # Actor-Critic Model
-        model = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                        opt.image_dim, opt.memory_dim, opt.instr_dim,
-                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+    # Actor-Critic Model
+    model = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                    opt.image_dim, opt.memory_dim, opt.instr_dim,
+                    not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
 
     obss_preprocessor.vocab.save()
     if torch.cuda.is_available():
         model.cuda()
 
     def reshape_reward(_0, _1, reward, _2): return opt.reward_scale * reward
-    # Prepare trainer
+
     from babyai.rl.utils import ParallelEnv
-    trainer = ReinforcementTrainer(ParallelEnv(
-        envs), opt, model, model_name, obss_preprocessor, reshape_reward, 'ppo')
+    p_envs = ParallelEnv(envs)
+
+    # Prepare trainer
+    if opt.oc:
+        trainer = OptionTrainer(p_envs, opt, obss_preprocessor)
+    else:
+        trainer = ReinforcementTrainer(p_envs, opt, model, model_name, obss_preprocessor, reshape_reward, 'ppo')
 
     # Start training
     trainer.train()
 
 
 def init_argparser():
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 
     # Training algorithm arguments
     parser.add_argument('--env-name', required=True,
@@ -133,6 +131,8 @@ def init_argparser():
     # Option-Critic arguments
     parser.add_argument('--oc', action='store_true',
                         help='Enable option-critic version of ppo')
+    parser.add_argument('--n_options', type=int, default=4,
+                        help='How many options to consider')
 
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
