@@ -6,8 +6,8 @@ import torch
 
 import machine
 from machine.util import DictList
+from machine.models import PolicyMapping, SigmoidTermination
 from machine.util.callbacks import EpisodeLogger
-from machine.metrics import FrobeniusNorm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -24,8 +24,6 @@ class ReinforcementTrainer(object):
         self._trainer = f"Reinforcement Trainer - algorithm: {algo_name}"
         self._algo = algo_name
         self.env = envs
-        self.model = model
-        self.model.train()
         self.preprocess_obss = obs
         self.reshape_reward = reshape_reward
         self.logger = logging.getLogger(__name__)
@@ -55,9 +53,6 @@ class ReinforcementTrainer(object):
         self.disrupt_mode = opt.disrupt
         self.disrupt_coef = opt.disrupt_coef
 
-        # Initialize experience matrices
-        self.init_experience_matrices()
-
         # Initialize observations
         self.obs = self.env.reset()
         self.obss = [None] * self.frames_per_proc
@@ -72,18 +67,34 @@ class ReinforcementTrainer(object):
 
         # Set parameters for specific algorithms
         if algo_name == 'ppo':
+            self.epochs = opt.ppo_epochs
+            self.model = model
+            self.model.train()
             self.optimizer = torch.optim.Adam(self.model.parameters(
             ), self.lr, (opt.beta1, opt.beta2), eps=opt.optim_eps)
-            self.epochs = opt.ppo_epochs
         elif algo_name == 'ppoc':
-            self.optimizer = torch.optim.RMSprop(self.model.parameters(), self.lr)
             self.epochs = opt.ppo_epochs
+            self.models = model
+            for model in self.models:
+                model.train()
+            self.optimizer = [torch.optim.Adam(
+                m.parameters(), self.lr) for m in self.models]
+            self.policy_over_options = PolicyMapping()
+            rng = numpy.random.RandomState(42)
+            self.policy_terminations = [SigmoidTermination(
+                rng, 0.001, 1) for _ in range(len(self.models))]
+            self.eta = 0.025
+            assert opt.n_options == 1
         else:
             raise ValueError("Not a valid implemented RL algorithm!")
 
-        self.logger.info(f"Setup {self._trainer}, with model_name: {model_name}")
+        # Initialize experience matrices
+        self.init_experience_matrices()
 
-    def collect_experiences(self, intrinsic_reward=False):
+        self.logger.info(
+            f"Setup {self._trainer}, with model_name: {model_name}")
+
+    def collect_experiences(self, intrinsic_reward=False, use_options=False):
         """
         Collect actions, observations and rewards over multiple concurrent
         environments.
@@ -99,7 +110,16 @@ class ReinforcementTrainer(object):
             # Do one agent-environment interaction
             preprocessed_obs = self.preprocess_obss(self.obs, device=device)
             with torch.no_grad():
-                model_results = self.model(preprocessed_obs, self.memory * self.mask.unsqueeze(1))
+                if use_options:
+                    # Check which option to take
+                    option_index = self.policy_over_options.pick_option()
+                    policy = self.models[option_index]
+                    # Get actions based on option
+                    model_results = policy(
+                        preprocessed_obs, self.memory * self.mask.unsqueeze(1))
+                else:
+                    model_results = self.model(
+                        preprocessed_obs, self.memory * self.mask.unsqueeze(1))
                 dist = model_results['dist']
                 value = model_results['value']
                 memory = model_results['memory']
@@ -107,12 +127,16 @@ class ReinforcementTrainer(object):
             action = dist.sample()
 
             obs, reward, done, env_info = self.env.step(action.cpu().numpy())
+            # TODO: reward - c_t
 
             # Update experiences values
             self.update_memory(i, action, value, obs, reward, done)
             self.obs = obs
             self.memory = memory
-            self.mask = 1 - torch.tensor(done, device=device, dtype=torch.float)
+            self.mask = 1 - \
+                torch.tensor(done, device=device, dtype=torch.float)
+
+            # Check if option terminates in new state: self.obs
 
             # Update log values
             self.update_log_values(i, dist, action, reward, done)
@@ -246,7 +270,10 @@ class ReinforcementTrainer(object):
             self.callback.on_cycle_start()
 
             # Create experiences and update the training status
-            exps, logs = self.collect_experiences(intrinsic_reward=(num_frames < self.explore_for))
+            exps, logs = self.collect_experiences(
+                intrinsic_reward=(num_frames < self.explore_for),
+                use_options=(self._algo == 'ppoc')
+            )
 
             # Use experience to update policy
             logs = self.update_model_parameters(exps, logs)
@@ -261,10 +288,12 @@ class ReinforcementTrainer(object):
         Initialize matrices used in the storing of observations.
         """
         shape = (self.frames_per_proc, self.num_procs)
-
-        self.memory = torch.zeros(shape[1], self.model.memory_size, device=device)
-        self.memories = torch.zeros(*shape, self.model.memory_size, device=device)
-
+        if self._algo == 'ppo':
+            memsize = self.model.memory_size
+        elif self._algo == 'ppoc':
+            memsize = self.models[0].memory_size
+        self.memory = torch.zeros(shape[1], memsize, device=device)
+        self.memories = torch.zeros(*shape, memsize, device=device)
         self.mask = torch.ones(shape[1], device=device)
         self.masks = torch.zeros(*shape, device=device)
         self.actions = torch.zeros(*shape, device=device, dtype=torch.int)
@@ -273,13 +302,18 @@ class ReinforcementTrainer(object):
         self.advantages = torch.zeros(*shape, device=device)
         self.log_probs = torch.zeros(*shape, device=device)
 
+        if self._algo == 'ppoc':
+            self.c_t = torch.zeros(shape[1], device=device)
+
     def init_log_vars(self):
         """
         Initialize the variables used for logging training progress.
         """
         self.log_episode_return = torch.zeros(self.num_procs, device=device)
-        self.log_episode_reshaped_return = torch.zeros(self.num_procs, device=device)
-        self.log_episode_num_frames = torch.zeros(self.num_procs, device=device)
+        self.log_episode_reshaped_return = torch.zeros(
+            self.num_procs, device=device)
+        self.log_episode_num_frames = torch.zeros(
+            self.num_procs, device=device)
 
         self.log_done_counter = 0
         self.log_return = [0] * self.num_procs
@@ -308,22 +342,26 @@ class ReinforcementTrainer(object):
         Update the logging values used for keeping track of training progress.
         """
         self.log_probs[i] = dist.log_prob(action)
-        self.log_episode_return += torch.tensor(reward, device=device, dtype=torch.float)
+        self.log_episode_return += torch.tensor(
+            reward, device=device, dtype=torch.float)
         self.log_episode_reshaped_return += self.rewards[i]
-        self.log_episode_num_frames += torch.ones(self.num_procs, device=device)
+        self.log_episode_num_frames += torch.ones(
+            self.num_procs, device=device)
 
         for j, done_ in enumerate(done):
             if done_:
                 self.log_done_counter += 1
                 self.log_return.append(self.log_episode_return[j].item())
-                self.log_reshaped_return.append(self.log_episode_reshaped_return[j].item())
-                self.log_num_frames.append(self.log_episode_num_frames[j].item())
+                self.log_reshaped_return.append(
+                    self.log_episode_reshaped_return[j].item())
+                self.log_num_frames.append(
+                    self.log_episode_num_frames[j].item())
 
         self.log_episode_return *= self.mask
         self.log_episode_reshaped_return *= self.mask
         self.log_episode_num_frames *= self.mask
 
-    def compute_advantage(self):
+    def compute_advantage(self, option_idx=None):
         """
         Run the advantage estimation from [1].
 
@@ -335,16 +373,25 @@ class ReinforcementTrainer(object):
         """
         preprocessed_obs = self.preprocess_obss(self.obs, device=device)
         with torch.no_grad():
-            next_value = self.model(
-                preprocessed_obs, self.memory * self.mask.unsqueeze(1))['value']
+            if option_idx is not None:
+                next_value = self.models[option_idx](
+                    preprocessed_obs, self.memory * self.mask.unsqueeze(1))['value']
+            else:
+                next_value = self.model(
+                    preprocessed_obs, self.memory * self.mask.unsqueeze(1))['value']
 
         for i in reversed(range(self.frames_per_proc)):
-            next_mask = self.masks[i + 1] if i < self.frames_per_proc - 1 else self.mask
-            next_value = self.values[i + 1] if i < self.frames_per_proc - 1 else next_value
-            next_advantage = self.advantages[i + 1] if i < self.frames_per_proc - 1 else 0
+            next_mask = self.masks[i +
+                                   1] if i < self.frames_per_proc - 1 else self.mask
+            next_value = self.values[i +
+                                     1] if i < self.frames_per_proc - 1 else next_value
+            next_advantage = self.advantages[i +
+                                             1] if i < self.frames_per_proc - 1 else 0
 
-            delta = self.rewards[i] + self.discount * next_value * next_mask - self.values[i]
-            self.advantages[i] = delta + self.discount * self.gae_lambda * next_advantage * next_mask
+            delta = self.rewards[i] + self.discount * \
+                next_value * next_mask - self.values[i]
+            self.advantages[i] = delta + self.discount * \
+                self.gae_lambda * next_advantage * next_mask
 
     def compute_disruptiveness(self):
         """
@@ -357,12 +404,15 @@ class ReinforcementTrainer(object):
 
         for i in range(self.frames_per_proc):
             s_t = self.obss[i]
-            s_t1 = self.obss[i+1] if i < (self.frames_per_proc - 1) else self.obs
+            s_t1 = self.obss[i +
+                             1] if i < (self.frames_per_proc - 1) else self.obs
 
             # Binary difference
             state_t = torch.Tensor([s['image'] for s in s_t])
             state_t1 = torch.Tensor([s['image'] for s in s_t1])
-            self.advantages[i] = torch.nonzero(state_t - state_t1).size()[0]
+            val = torch.nonzero(state_t - state_t1).size()[0]
+            # Normalize over max change
+            self.advantages[i] = val / (7 * 7 * self.num_procs)
 
     def flatten_data(self):
         """

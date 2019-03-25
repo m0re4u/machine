@@ -6,6 +6,5 @@ from .baseSeqModel import BaseSeqModel
 from .baseModel import BaseModel
 from .LanguageModel import LanguageModel
 from .ACModel import ACModel, FiLMedBlock
-from .OCModel import OCModel
-from .SoftmaxPolicy import SoftmaxPolicy
+from .SoftmaxPolicy import SoftmaxPolicy, PolicyMapping
 from .SigmoidTermination import SigmoidTermination

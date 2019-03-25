@@ -8,8 +8,8 @@ import gym
 import torch
 
 import babyai
-from machine.trainer import ReinforcementTrainer, OptionTrainer
-from machine.models import ACModel, OCModel
+from machine.trainer import ReinforcementTrainer
+from machine.models import ACModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -34,6 +34,8 @@ def train_model():
         env = gym.make(opt.env_name)
         env.seed(100 * opt.seed + i)
         envs.append(env)
+    from babyai.rl.utils import ParallelEnv
+    p_envs = ParallelEnv(envs)
 
     # Create model name
     model_name = get_model_name(opt)
@@ -41,33 +43,39 @@ def train_model():
     # Observation preprocessor
     obss_preprocessor = babyai.utils.ObssPreprocessor(
         model_name, envs[0].observation_space, None)
-
-    # Actor-Critic Model
-    model = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                    opt.image_dim, opt.memory_dim, opt.instr_dim,
-                    not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
-
     obss_preprocessor.vocab.save()
-    if torch.cuda.is_available():
-        model.cuda()
 
     def reshape_reward(_0, _1, reward, _2): return opt.reward_scale * reward
 
-    from babyai.rl.utils import ParallelEnv
-    p_envs = ParallelEnv(envs)
-
-    # Prepare trainer
+    # Prepare agent model. If option critic, make as many as there are options
     if opt.oc:
-        trainer = OptionTrainer(p_envs, opt, obss_preprocessor)
+        algo = 'ppoc'
+        args = [obss_preprocessor.obs_space, envs[0].action_space, opt.image_dim, opt.memory_dim,
+                opt.instr_dim, not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch]
+        model = [ACModel(*args) for _ in range(opt.n_options)]
+        if torch.cuda.is_available():
+            for m in model:
+                m.cuda()
+
+
     else:
-        trainer = ReinforcementTrainer(p_envs, opt, model, model_name, obss_preprocessor, reshape_reward, 'ppo')
+        algo = 'ppo'
+        model = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                        opt.image_dim, opt.memory_dim, opt.instr_dim,
+                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+        if torch.cuda.is_available():
+            model.cuda()
+
+    trainer = ReinforcementTrainer(
+        p_envs, opt, model, model_name, obss_preprocessor, reshape_reward, algo)
 
     # Start training
     trainer.train()
 
 
 def init_argparser():
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter)
 
     # Training algorithm arguments
     parser.add_argument('--env-name', required=True,
@@ -131,7 +139,7 @@ def init_argparser():
     # Option-Critic arguments
     parser.add_argument('--oc', action='store_true',
                         help='Enable option-critic version of ppo')
-    parser.add_argument('--n_options', type=int, default=4,
+    parser.add_argument('--n_options', type=int, default=1,
                         help='How many options to consider')
 
     # Model parameters
@@ -204,10 +212,10 @@ def get_model_name(opt):
     suffix = datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")
     instr = opt.instr_arch if opt.instr_arch else "noinstr"
     mem = "mem" if not opt.no_mem else "nomem"
-    mod = "ACModel" if not opt.oc else "OCModel"
+    alg = "PPO" if not opt.oc else "PPOC"
     jobid = f'_job{opt.slurm_id}' if opt.slurm_id != 0 else ''
     model_name_parts = {
-        'mod': mod,
+        'alg': alg,
         'env': opt.env_name,
         'arch': opt.arch,
         'instr': instr,
@@ -215,7 +223,7 @@ def get_model_name(opt):
         'seed': opt.seed,
         'jobid': jobid,
         'suffix': suffix}
-    return "{env}_{mod}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+    return "{env}_{alg}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
 
 
 if __name__ == "__main__":

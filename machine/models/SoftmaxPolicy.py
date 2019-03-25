@@ -1,4 +1,6 @@
 import numpy as np
+import torch.nn as nn
+import torch.functional as F
 from scipy.misc import logsumexp
 
 
@@ -31,3 +33,10 @@ class SoftmaxPolicy():
         actions_pmf = self.pmf(state)
         self.weights[state, :] -= self.lr * actions_pmf * Q_U
         self.weights[state, action] += self.lr * Q_U
+
+class PolicyMapping():
+    def __init__(self):
+        pass
+
+    def pick_option(self):
+        return 0
