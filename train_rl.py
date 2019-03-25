@@ -118,7 +118,8 @@ def init_argparser():
                         help="Add disruptiveness metric with the following semantics:\n\n\
 0: No disruptiveness\n\
 1: policy_loss * log(sum(binary_diff(s1,s2))), clipped to [0.01, 10]\n\
-2: value_loss * log(sum(binary_diff(s1,s2))), clipped to [0.01, 10]\n\n")
+2: value_loss * log(sum(binary_diff(s1,s2))), clipped to [0.01, 10]\n\
+3: Replace advantage with intrinsic reward for explore_for frames\n\n")
 
     # PPO arguments
     parser.add_argument('--gamma', type=float, default=0.99,
@@ -185,6 +186,11 @@ def validate_options(parser, opt):
     if opt.resume and not opt.load_checkpoint:
         parser.error(
             "load_checkpoint argument is required to resume training from checkpoint")
+
+    if opt.disrupt == 3 and opt.explore == 0:
+        parser.error("Disrupt with intrinsic reward set but no exploration frames")
+    if opt.disrupt == 0 and opt.explore > 0:
+        parser.error("No disrupt but exploration frames are defined")
 
     if torch.cuda.is_available():
         logging.info(f"CUDA device set to {opt.cuda_device}")
