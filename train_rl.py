@@ -187,9 +187,9 @@ def validate_options(parser, opt):
         parser.error(
             "load_checkpoint argument is required to resume training from checkpoint")
 
-    if opt.disrupt == 3 and opt.explore == 0:
+    if opt.disrupt == 3 and opt.explore_for == 0:
         parser.error("Disrupt with intrinsic reward set but no exploration frames")
-    if opt.disrupt == 0 and opt.explore > 0:
+    if opt.disrupt == 0 and opt.explore_for > 0:
         parser.error("No disrupt but exploration frames are defined")
 
     if torch.cuda.is_available():
