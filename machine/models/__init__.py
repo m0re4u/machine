@@ -8,3 +8,4 @@ from .LanguageModel import LanguageModel
 from .ACModel import ACModel, FiLMedBlock
 from .SoftmaxPolicy import SoftmaxPolicy, PolicyMapping
 from .SigmoidTermination import SigmoidTermination
+from .EmbeddingModel import SkillEmbedding

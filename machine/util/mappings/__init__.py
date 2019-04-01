@@ -1,0 +1,1 @@
+from .InstructionMapping import CommandMapping, ColorMapping, ObjectMapping

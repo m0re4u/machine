@@ -9,7 +9,7 @@ import torch
 
 import babyai
 from machine.trainer import ReinforcementTrainer
-from machine.models import ACModel
+from machine.models import ACModel, SkillEmbedding
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -56,8 +56,13 @@ def train_model():
         if torch.cuda.is_available():
             for m in model:
                 m.cuda()
-
-
+    elif opt.se:
+        algo = 'ppo'
+        model = SkillEmbedding(obss_preprocessor.obs_space['image'],
+                               envs[0].action_space, opt.n_skills, obss_preprocessor.vocab,
+                               opt.image_dim, opt.memory_dim, not opt.no_mem)
+        if torch.cuda.is_available():
+            model.cuda()
     else:
         algo = 'ppo'
         model = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
@@ -143,6 +148,12 @@ def init_argparser():
     parser.add_argument('--n_options', type=int, default=1,
                         help='How many options to consider')
 
+    # Skill embedding arguments
+    parser.add_argument('--se', action='store_true',
+                        help='Enable skill embeddings')
+    parser.add_argument('--n_skills', type=int, default=1,
+                        help='How many skills to consider')
+
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
                         help="dimensionality of the image embedding")
@@ -188,7 +199,8 @@ def validate_options(parser, opt):
             "load_checkpoint argument is required to resume training from checkpoint")
 
     if opt.disrupt == 3 and opt.explore_for == 0:
-        parser.error("Disrupt with intrinsic reward set but no exploration frames")
+        parser.error(
+            "Disrupt with intrinsic reward set but no exploration frames")
     if opt.disrupt == 0 and opt.explore_for > 0:
         parser.error("No disrupt but exploration frames are defined")
 
@@ -198,11 +210,25 @@ def validate_options(parser, opt):
     else:
         logging.info("CUDA not available")
 
+    # Option-Critic and SkillEmbedding are mutually exclusive
+    if opt.se:
+        assert not opt.oc
+        logging.warning("OPTION-CRITIC IS UNFINISHED AND SHOULD NOT BE USED YET")
+    if opt.oc:
+        assert not opt.se
+
     torch.manual_seed(opt.seed)
     torch.cuda.manual_seed_all(opt.seed)
 
     config = vars(opt)
     logging.info("Parameters:")
+
+    # Ignore settings for Option-Critic or SkillEmbedding if they're not enabled
+    if not config['oc']:
+        config.pop('n_options')
+    if not config['se']:
+        config.pop('n_skills')
+
     for k, v in config.items():
         logging.info(f"  {k:>21} : {v}")
 
@@ -219,9 +245,11 @@ def get_model_name(opt):
     instr = opt.instr_arch if opt.instr_arch else "noinstr"
     mem = "mem" if not opt.no_mem else "nomem"
     alg = "PPO" if not opt.oc else "PPOC"
+    mod = "AC" if not opt.se else "SE"
     jobid = f'_job{opt.slurm_id}' if opt.slurm_id != 0 else ''
     model_name_parts = {
         'alg': alg,
+        'mod': mod,
         'env': opt.env_name,
         'arch': opt.arch,
         'instr': instr,
@@ -229,7 +257,7 @@ def get_model_name(opt):
         'seed': opt.seed,
         'jobid': jobid,
         'suffix': suffix}
-    return "{env}_{alg}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+    return "{env}_{alg}_{mod}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
 
 
 if __name__ == "__main__":
