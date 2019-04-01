@@ -60,7 +60,7 @@ def train_model():
         algo = 'ppo'
         model = SkillEmbedding(obss_preprocessor.obs_space['image'],
                                envs[0].action_space, opt.n_skills, obss_preprocessor.vocab,
-                               opt.image_dim, opt.memory_dim, not opt.no_mem)
+                               opt.image_dim, opt.memory_dim, not opt.no_mem, opt.num_processes)
         if torch.cuda.is_available():
             model.cuda()
     else:

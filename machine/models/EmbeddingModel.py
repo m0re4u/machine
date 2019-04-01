@@ -20,9 +20,10 @@ class SkillEmbedding(BaseModel):
     """
     """
 
-    def __init__(self, input_size, action_space, n_skills, vocab, embedding_dim=32, memory_dim=128, use_memory=False):
+    def __init__(self, input_size, action_space, n_skills, vocab, embedding_dim=32, memory_dim=128, use_memory=False, num_procs=64):
         super().__init__()
         self.n_skills = n_skills
+        self.num_procs = num_procs
         self.use_memory = use_memory
         self.memory_dim = memory_dim
         self.embedding_dim = embedding_dim
@@ -33,7 +34,7 @@ class SkillEmbedding(BaseModel):
                 nn.ReLU(),
                 nn.Linear(128, 64),
                 nn.ReLU(),
-                nn.Linear(64, embedding_dim)
+                nn.Linear(64, self.embedding_dim)
             ))
 
         # Define actor's model
@@ -55,9 +56,16 @@ class SkillEmbedding(BaseModel):
 
     def forward(self, obs, memory):
         skill_idx = self.instr_mapping(obs.instr)
-        print(skill_idx.size()) # per batch item the index of the skill trunk to use
-        print(obs.image.size()) # per batch item the observation to put through the network
-        h = self.skill_embeddings[skill_idx](obs.image)
+        h = torch.zeros((64, 128))
+        for i in range(6):
+            mask = (skill_idx == i)
+            print(mask.size())
+            aa = obs.image[mask]
+            if aa.shape[0] == 0:
+                continue
+            print(aa.size())
+            aa = aa.reshape(aa.shape[0], -1)
+            h[mask] = self.skill_embeddings[i](aa)
 
         act = self.policy(h)
         dist = Categorical(logits=F.log_softmax(act, dim=1))
@@ -72,4 +80,9 @@ class SkillEmbedding(BaseModel):
 
     @property
     def memory_size(self):
+        return 2 * self.semi_memory_size
+
+    @property
+    def semi_memory_size(self):
         return self.memory_dim
+
