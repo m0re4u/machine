@@ -56,16 +56,14 @@ class SkillEmbedding(BaseModel):
 
     def forward(self, obs, memory):
         skill_idx = self.instr_mapping(obs.instr)
-        h = torch.zeros((64, 128))
+        h = torch.zeros((obs.instr.size()[0], 128))
         for i in range(6):
             mask = (skill_idx == i)
-            print(mask.size())
-            aa = obs.image[mask]
-            if aa.shape[0] == 0:
+            a = obs.image[mask]
+            if a.shape[0] == 0:
                 continue
-            print(aa.size())
-            aa = aa.reshape(aa.shape[0], -1)
-            h[mask] = self.skill_embeddings[i](aa)
+            a = a.reshape(a.shape[0], -1)
+            h[mask] = self.skill_embeddings[i](a)
 
         act = self.policy(h)
         dist = Categorical(logits=F.log_softmax(act, dim=1))
