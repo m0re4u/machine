@@ -63,7 +63,7 @@ class SkillEmbedding(BaseModel):
 
 
     def forward(self, obs, memory):
-        skill_idx = self.instr_mapping(obs.instr)
+        skill_idx = self.instr_mapping(obs.instr.cpu())
         h = torch.zeros((obs.instr.size()[0], 128))
         for i in range(6):
             mask = (skill_idx == i)
