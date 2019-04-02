@@ -7,6 +7,8 @@ from machine.models import BaseModel
 from machine.util.mappings import CommandMapping, ColorMapping, ObjectMapping
 
 # Function from https://github.com/ikostrikov/pytorch-a2c-ppo-acktr/blob/master/model.py
+
+
 def initialize_parameters(m):
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
@@ -16,11 +18,12 @@ def initialize_parameters(m):
         if m.bias is not None:
             m.bias.data.fill_(0)
 
+
 class SkillEmbedding(BaseModel):
     """
     """
 
-    def __init__(self, input_size, action_space, n_skills, vocab, embedding_dim=32, memory_dim=128, use_memory=False, num_procs=64):
+    def __init__(self, input_size, action_space, n_skills, vocab, embedding_dim=32, memory_dim=128, use_memory=False, mapping='color', num_procs=64):
         super().__init__()
         self.n_skills = n_skills
         self.num_procs = num_procs
@@ -50,9 +53,14 @@ class SkillEmbedding(BaseModel):
             nn.Tanh(),
             nn.Linear(64, 1)
         )
+        if mapping == 'color':
+            # Instruction mapping
+            self.instr_mapping = ColorMapping(vocab)
+        elif mapping == 'object':
+            self.instr_mapping = ObjectMapping(vocab)
+        elif mapping == 'command':
+            self.instr_mapping = CommandMapping(vocab)
 
-        # Instruction mapping
-        self.instr_mapping = ColorMapping(vocab)
 
     def forward(self, obs, memory):
         skill_idx = self.instr_mapping(obs.instr)
@@ -83,4 +91,3 @@ class SkillEmbedding(BaseModel):
     @property
     def semi_memory_size(self):
         return self.memory_dim
-

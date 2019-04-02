@@ -60,7 +60,7 @@ def train_model():
         algo = 'ppo'
         model = SkillEmbedding(obss_preprocessor.obs_space['image'],
                                envs[0].action_space, opt.n_skills, obss_preprocessor.vocab,
-                               opt.image_dim, opt.memory_dim, not opt.no_mem, opt.num_processes)
+                               opt.image_dim, opt.memory_dim, not opt.no_mem, opt.mapping, opt.num_processes)
         if torch.cuda.is_available():
             model.cuda()
     else:
@@ -153,6 +153,8 @@ def init_argparser():
                         help='Enable skill embeddings')
     parser.add_argument('--n_skills', type=int, default=1,
                         help='How many skills to consider')
+    parser.add_argument('--mapping', type=str, default='color', choices=['color', 'object', 'command'],
+                        help='What mapping to use to select the skill trunks')
 
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
@@ -228,6 +230,7 @@ def validate_options(parser, opt):
         config.pop('n_options')
     if not config['se']:
         config.pop('n_skills')
+        config.pop('mapping')
 
     for k, v in config.items():
         logging.info(f"  {k:>21} : {v}")
