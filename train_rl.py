@@ -62,6 +62,7 @@ def train_model():
                                envs[0].action_space, opt.n_skills, obss_preprocessor.vocab,
                                opt.image_dim, opt.memory_dim, not opt.no_mem, opt.mapping, opt.num_processes)
         if torch.cuda.is_available():
+            print(model)
             model.cuda()
     else:
         algo = 'ppo'

@@ -2,6 +2,8 @@ import abc
 import torch
 import numpy as np
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class BaseMapping(abc.ABC):
     @abc.abstractmethod
     def __call__(self):
@@ -42,9 +44,9 @@ class ColorMapping(BaseMapping):
         }
 
     def __call__(self, instruction):
-        kept = np.isin(instruction, list(self.mapping.keys())).astype(np.uint8)
+        kept = np.isin(instruction.cpu(), list(self.mapping.keys())).astype(np.uint8)
         idx = instruction[torch.from_numpy(kept)]
-        return torch.Tensor([self.mapping[id.item()] for id in idx])
+        return torch.tensor([self.mapping[id.item()] for id in idx], device=device)
 
 
 class ObjectMapping(BaseMapping):

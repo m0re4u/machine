@@ -1,4 +1,5 @@
 import torch
+import logging
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
@@ -30,15 +31,17 @@ class SkillEmbedding(BaseModel):
         self.use_memory = use_memory
         self.memory_dim = memory_dim
         self.embedding_dim = embedding_dim
-        self.skill_embeddings = []
+        self.logger = logging.getLogger(__name__)
+        trunks = []
         for i in range(n_skills):
-            self.skill_embeddings.append(nn.Sequential(
+            trunks.append(nn.Sequential(
                 nn.Linear(input_size, 128),
                 nn.ReLU(),
                 nn.Linear(128, 64),
                 nn.ReLU(),
                 nn.Linear(64, self.embedding_dim)
             ))
+        self.skill_embeddings = nn.ModuleList(trunks)
 
         # Define actor's model
         self.policy = nn.Sequential(
@@ -63,7 +66,7 @@ class SkillEmbedding(BaseModel):
 
 
     def forward(self, obs, memory):
-        skill_idx = self.instr_mapping(obs.instr.cpu())
+        skill_idx = self.instr_mapping(obs.instr)
         h = torch.zeros((obs.instr.size()[0], 128))
         for i in range(6):
             mask = (skill_idx == i)
