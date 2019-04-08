@@ -178,6 +178,20 @@ class ACModel(BaseModel):
     def semi_memory_size(self):
         return self.memory_dim
 
+    @property
+    def model_hyperparameters(self):
+        return [
+            self.use_instr,
+            self.use_memory,
+            self.arch,
+            self.lang_model,
+            self.image_dim,
+            self.memory_dim,
+            self.instr_dim,
+            self.obs_space,
+            self.action_space
+        ]
+
     def reset_parameters(self):
         return self.apply(initialize_parameters)
 

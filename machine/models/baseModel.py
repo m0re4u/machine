@@ -38,3 +38,8 @@ class BaseModel(ABC, nn.Module):
               outputs of the decoder.
         """
         pass
+
+    @property
+    @abc.abstractmethod
+    def model_hyperparameters(self):
+        pass

@@ -248,19 +248,33 @@ def get_model_name(opt):
     instr = opt.instr_arch if opt.instr_arch else "noinstr"
     mem = "mem" if not opt.no_mem else "nomem"
     alg = "PPO" if not opt.oc else "PPOC"
-    mod = "AC" if not opt.se else "SE"
     jobid = f'_job{opt.slurm_id}' if opt.slurm_id != 0 else ''
-    model_name_parts = {
-        'alg': alg,
-        'mod': mod,
-        'env': opt.env_name,
-        'arch': opt.arch,
-        'instr': instr,
-        'mem': mem,
-        'seed': opt.seed,
-        'jobid': jobid,
-        'suffix': suffix}
-    return "{env}_{alg}_{mod}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+    if opt.se:
+        mod = "SE"
+        model_name_parts = {
+            'alg': alg,
+            'mod': mod,
+            'env': opt.env_name,
+            'mem': mem,
+            'seed': opt.seed,
+            'jobid': jobid,
+            'suffix': suffix
+            }
+        return "{env}_{alg}_{mod}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+    else:
+        mod = "AC"
+        model_name_parts = {
+            'alg': alg,
+            'mod': mod,
+            'env': opt.env_name,
+            'arch': opt.arch,
+            'instr': instr,
+            'mem': mem,
+            'seed': opt.seed,
+            'jobid': jobid,
+            'suffix': suffix
+            }
+        return "{env}_{alg}_{mod}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
 
 
 if __name__ == "__main__":

@@ -157,17 +157,7 @@ class RLCheckpoint(BaseCheckpoint):
             'num_frames': self.status['num_frames'],
             'optimizer': self.optimizer.state_dict(),
             'model': self.model.state_dict(),
-            'model_params': {
-                'obs_space': self.model.obs_space,
-                'action_space': self.model.action_space,
-                'image_dim': self.model.image_dim,
-                'memory_dim': self.model.memory_dim,
-                'instr_dim': self.model.instr_dim,
-                'use_instr': self.model.use_instr,
-                'lang_model': self.model.lang_model,
-                'use_memory': self.model.use_memory,
-                'arch': self.model.arch,
-            }
+            'model_params': self.model.model_hyperparameters
         }
         logger.info(f"Saving RLCheckpoint to {path}")
         torch.save(state, path)

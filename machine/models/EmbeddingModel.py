@@ -26,7 +26,9 @@ class SkillEmbedding(BaseModel):
     """
     """
 
-    def __init__(self, input_size, action_space, n_skills, vocab, embedding_dim=32, memory_dim=128, use_memory=False, mapping='color', num_procs=64):
+    def __init__(self, input_size, action_space, n_skills, vocab,
+                 embedding_dim=32, memory_dim=128, use_memory=False,
+                 mapping='color', num_procs=64):
         super().__init__()
         self.n_skills = n_skills
         self.num_procs = num_procs
@@ -94,3 +96,13 @@ class SkillEmbedding(BaseModel):
     @property
     def semi_memory_size(self):
         return self.memory_dim
+
+    @property
+    def model_hyperparameters(self):
+        return [
+            self.n_skills,
+            self.num_procs,
+            self.use_memory,
+            self.memory_dim,
+            self.embedding_dim
+        ]
