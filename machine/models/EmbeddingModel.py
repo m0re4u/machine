@@ -7,6 +7,8 @@ from torch.distributions.categorical import Categorical
 from machine.models import BaseModel
 from machine.util.mappings import CommandMapping, ColorMapping, ObjectMapping
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # Function from https://github.com/ikostrikov/pytorch-a2c-ppo-acktr/blob/master/model.py
 
 
@@ -32,16 +34,15 @@ class SkillEmbedding(BaseModel):
         self.memory_dim = memory_dim
         self.embedding_dim = embedding_dim
         self.logger = logging.getLogger(__name__)
-        trunks = []
+        self.skill_embeddings = nn.ModuleList()
         for i in range(n_skills):
-            trunks.append(nn.Sequential(
+            self.skill_embeddings.append(nn.Sequential(
                 nn.Linear(input_size, 128),
                 nn.ReLU(),
                 nn.Linear(128, 64),
                 nn.ReLU(),
                 nn.Linear(64, self.embedding_dim)
             ))
-        self.skill_embeddings = nn.ModuleList(trunks)
 
         # Define actor's model
         self.policy = nn.Sequential(
@@ -64,10 +65,9 @@ class SkillEmbedding(BaseModel):
         elif mapping == 'command':
             self.instr_mapping = CommandMapping(vocab)
 
-
     def forward(self, obs, memory):
         skill_idx = self.instr_mapping(obs.instr)
-        h = torch.zeros((obs.instr.size()[0], 128))
+        h = torch.zeros((obs.instr.size()[0], 128)).to(device=device)
         for i in range(6):
             mask = (skill_idx == i)
             a = obs.image[mask]
