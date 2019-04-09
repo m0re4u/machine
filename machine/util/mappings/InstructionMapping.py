@@ -46,7 +46,8 @@ class ColorMapping(BaseMapping):
     def __call__(self, instruction):
         kept = np.isin(instruction.cpu(), list(self.mapping.keys())).astype(np.uint8)
         idx = instruction[torch.from_numpy(kept)]
-        return torch.tensor([self.mapping[id.item()] for id in idx], device=device)
+        x = torch.tensor([self.mapping[id.item()] for id in idx], device=device)
+        return x
 
 
 class ObjectMapping(BaseMapping):
@@ -68,3 +69,14 @@ class ObjectMapping(BaseMapping):
             return self.mapping['box']
         elif self.vocab['door'] in instruction:
             return self.mapping['door']
+
+class RandomMapping(BaseMapping):
+    def __init__(self, max_num=6, seed=0):
+        self.max_num = max_num
+
+    def __call__(self, instruction):
+        return torch.randint(self.max_num, size=(64,))
+
+class ConstantMapping(BaseMapping):
+    def __call__(self, instruction):
+        return torch.zeros((64,))

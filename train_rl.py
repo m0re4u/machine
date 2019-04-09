@@ -1,11 +1,10 @@
 import argparse
 import datetime
 import logging
-import os
-import time
 
 import gym
 import torch
+import numpy as np
 
 import babyai
 from machine.trainer import ReinforcementTrainer
@@ -151,9 +150,9 @@ def init_argparser():
     # Skill embedding arguments
     parser.add_argument('--se', action='store_true',
                         help='Enable skill embeddings')
-    parser.add_argument('--n_skills', type=int, default=1,
+    parser.add_argument('--n_skills', type=int, default=6,
                         help='How many skills to consider')
-    parser.add_argument('--mapping', type=str, default='color', choices=['color', 'object', 'command'],
+    parser.add_argument('--mapping', type=str, default='color', choices=['color', 'object', 'command', 'random', 'constant'],
                         help='What mapping to use to select the skill trunks')
 
     # Model parameters
@@ -221,6 +220,7 @@ def validate_options(parser, opt):
 
     torch.manual_seed(opt.seed)
     torch.cuda.manual_seed_all(opt.seed)
+    np.random.seed(opt.seed)
 
     config = vars(opt)
     logging.info("Parameters:")

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 
 from machine.models import BaseModel
-from machine.util.mappings import CommandMapping, ColorMapping, ObjectMapping
+from machine.util.mappings import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -66,6 +66,10 @@ class SkillEmbedding(BaseModel):
             self.instr_mapping = ObjectMapping(vocab)
         elif mapping == 'command':
             self.instr_mapping = CommandMapping(vocab)
+        elif mapping == 'random':
+            self.instr_mapping = RandomMapping(self.n_skills)
+        elif mapping == 'constant':
+            self.instr_mapping = ConstantMapping()
 
     def forward(self, obs, memory):
         skill_idx = self.instr_mapping(obs.instr)

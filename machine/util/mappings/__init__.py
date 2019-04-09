@@ -1,1 +1,1 @@
-from .InstructionMapping import CommandMapping, ColorMapping, ObjectMapping
+from .InstructionMapping import CommandMapping, ColorMapping, ObjectMapping, RandomMapping, ConstantMapping
