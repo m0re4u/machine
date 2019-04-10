@@ -98,7 +98,7 @@ class RandomAgent:
                 'dist': None,
                 'value': None}
 
-def load_agent(env, model_name, argmax=True, env_name=None):
+def load_agent(env, model_name, argmax=True, env_name=None, vocab=None):
     # env_name needs to be specified for demo agents
-    obss_preprocessor = babyai.utils.ObssPreprocessor(model_name, env.observation_space)
+    obss_preprocessor = babyai.utils.ObssPreprocessor(model_name, env.observation_space, load_vocab_from=vocab)
     return ModelAgent(model_name, obss_preprocessor, argmax)

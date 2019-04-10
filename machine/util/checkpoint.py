@@ -9,7 +9,7 @@ import dill
 import torch
 from torch.nn import DataParallel
 
-from machine.models import ACModel
+from machine.models import ACModel, SkillEmbedding
 
 from .base_checkpoint import BaseCheckpoint
 
@@ -177,18 +177,13 @@ class RLCheckpoint(BaseCheckpoint):
         logger = logging.getLogger(__name__)
         logger.info(f"Loading RLCheckpoint from {path}")
         state = torch.load(path, map_location=torch.device('cpu'))
-        params = [
-            state['model_params']['obs_space'],
-            state['model_params']['action_space'],
-            state['model_params']['image_dim'],
-            state['model_params']['memory_dim'],
-            state['model_params']['instr_dim'],
-            state['model_params']['use_instr'],
-            state['model_params']['lang_model'],
-            state['model_params']['use_memory'],
-            state['model_params']['arch'],
-        ]
-        model = ACModel(*params)
+        if "SE" in path:
+            model = SkillEmbedding(*state['model_params'])
+        elif "AC" in path:
+            model = ACModel(*state['model_params'])
+        else:
+            logger.error("Error while assuming model")
+
         model.load_state_dict(state['model'])
         print(model)
         model.eval()

@@ -25,16 +25,19 @@ def initialize_parameters(m):
 class SkillEmbedding(BaseModel):
     """
     """
-
     def __init__(self, input_size, action_space, n_skills, vocab,
                  embedding_dim=32, memory_dim=128, use_memory=False,
                  mapping='color', num_procs=64):
         super().__init__()
+        self.input_size = input_size
+        self.action_space = action_space
+        self.vocab = vocab
         self.n_skills = n_skills
         self.num_procs = num_procs
         self.use_memory = use_memory
         self.memory_dim = memory_dim
         self.embedding_dim = embedding_dim
+        self.mapping = mapping
         self.logger = logging.getLogger(__name__)
         self.skill_embeddings = nn.ModuleList()
         for i in range(n_skills):
@@ -104,9 +107,13 @@ class SkillEmbedding(BaseModel):
     @property
     def model_hyperparameters(self):
         return [
+            self.input_size,
+            self.action_space,
             self.n_skills,
-            self.num_procs,
-            self.use_memory,
+            self.vocab,
+            self.embedding_dim,
             self.memory_dim,
-            self.embedding_dim
+            self.use_memory,
+            self.mapping,
+            self.num_procs
         ]

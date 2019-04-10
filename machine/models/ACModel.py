@@ -22,6 +22,10 @@ def initialize_parameters(m):
 class FiLMedBlock(BaseModel):
     def __init__(self, in_features, out_features, in_channels, imm_channels):
         super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.in_channels = in_channels
+        self.imm_channels = imm_channels
         self.conv1 = nn.Conv2d(
             in_channels=in_channels, out_channels=imm_channels, kernel_size=(3, 3), padding=1)
         self.bn1 = nn.BatchNorm2d(imm_channels)
@@ -45,6 +49,14 @@ class FiLMedBlock(BaseModel):
         out = self.bn2(out)
         out = F.relu(out)
         return out
+
+    def model_hyperparameters(self):
+        return [
+            self.in_features,
+            self.out_features,
+            self.in_channels,
+            self.imm_channels
+        ]
 
 
 class ACModel(BaseModel):
@@ -181,15 +193,15 @@ class ACModel(BaseModel):
     @property
     def model_hyperparameters(self):
         return [
-            self.use_instr,
-            self.use_memory,
-            self.arch,
-            self.lang_model,
+            self.obs_space,
+            self.action_space,
             self.image_dim,
             self.memory_dim,
             self.instr_dim,
-            self.obs_space,
-            self.action_space
+            self.use_instr,
+            self.lang_model,
+            self.use_memory,
+            self.arch
         ]
 
     def reset_parameters(self):

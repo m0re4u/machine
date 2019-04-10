@@ -37,6 +37,8 @@ if __name__ == "__main__":
                         help="name of the environment to be run (REQUIRED)")
     parser.add_argument("--model", default=None, required=True,
                         help="name of the trained model (REQUIRED)")
+    parser.add_argument("--vocab", default=None, required=True,
+                        help="vocabulary file (REQUIRED)")
     parser.add_argument("--seed", type=int, default=None,
                         help="random seed (default: 0 if model agent, 1 if demo agent)")
     parser.add_argument("--shift", type=int, default=0,
@@ -78,7 +80,7 @@ if __name__ == "__main__":
     print("Mission: {}".format(obs["mission"]))
 
     # Define agent and load trained model
-    agent = machine.util.load_agent(env, args.model, args.argmax, args.env)
+    agent = machine.util.load_agent(env, args.model, args.argmax, args.env, args.vocab)
 
     # Run the agent
     done = True
