@@ -21,6 +21,6 @@ python3 train_rl.py \
     --disrupt 0 \
     --se\
     --n_skills 1 \
-    --mapping constant
+    --mapping constant \
     --slurm_id $SLURM_JOB_ID \
     --tb
