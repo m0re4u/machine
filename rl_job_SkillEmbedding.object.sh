@@ -20,7 +20,7 @@ python3 train_rl.py \
     --print_every 1 \
     --disrupt 0 \
     --se \
-    --n_skills 6 \
-    --mapping random \
+    --n_skills 4 \
+    --mapping object \
     --slurm_id $SLURM_JOB_ID \
     --tb

@@ -19,7 +19,7 @@ python3 train_rl.py \
     --env-name BabyAI-GoToLocal-v0 \
     --print_every 1 \
     --disrupt 0 \
-    --se\
+    --se \
     --n_skills 1 \
     --mapping constant \
     --slurm_id $SLURM_JOB_ID \
