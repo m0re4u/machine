@@ -154,6 +154,8 @@ def init_argparser():
                         help='How many skills to consider')
     parser.add_argument('--mapping', type=str, default='color', choices=['color', 'object', 'command', 'random', 'constant'],
                         help='What mapping to use to select the skill trunks')
+    parser.add_argument('--trunk_arch', type=str, default='fcn',choices=['fcn', 'cnn'],
+                        help='Skill trunk architecture')
 
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
@@ -231,6 +233,7 @@ def validate_options(parser, opt):
     if not config['se']:
         config.pop('n_skills')
         config.pop('mapping')
+        config.pop('trunk_arch')
 
     for k, v in config.items():
         logging.info(f"  {k:>21} : {v}")
