@@ -41,6 +41,12 @@ class ColorMapping(BaseMapping):
 
     def __call__(self, instruction):
         kept = np.isin(instruction.cpu(), list(self.mapping.keys())).astype(np.uint8)
+        # Ugly hack for test time: only one sample at the time (no batch)
+        if instruction.size()[0] == 1:
+            # Keep last trunk index if we find multiple
+            _, nz_idx = np.nonzero(kept)
+            kept = np.zeros_like(instruction).astype(np.uint8)
+            kept[0, nz_idx.max()] = 1
         idx = instruction[torch.from_numpy(kept)]
         x = torch.tensor([self.mapping[id.item()] for id in idx], device=device)
         return x
