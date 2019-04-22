@@ -1,19 +1,22 @@
 import argparse
 import datetime
 import logging
+import os
+from pathlib import Path
 
 import gym
-import torch
 import numpy as np
+import torch
 
 import babyai
-from machine.trainer import ReinforcementTrainer
 from machine.models import ACModel, SkillEmbedding
+from machine.trainer import ReinforcementTrainer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # CONSTANTS
 LOG_FORMAT = '%(asctime)s %(name)-6s %(levelname)-6s %(message)s'
+VOCAB_FILENAME = Path('vocab.json')
 
 
 def train_model():
@@ -41,7 +44,7 @@ def train_model():
 
     # Observation preprocessor
     obss_preprocessor = babyai.utils.ObssPreprocessor(
-        model_name, envs[0].observation_space, None)
+        model_name, envs[0].observation_space, load_vocab_from=opt.vocab_file)
     obss_preprocessor.vocab.save()
 
     def reshape_reward(_0, _1, reward, _2): return opt.reward_scale * reward
@@ -154,7 +157,7 @@ def init_argparser():
                         help='How many skills to consider')
     parser.add_argument('--mapping', type=str, default='color', choices=['color', 'object', 'command', 'random', 'constant'],
                         help='What mapping to use to select the skill trunks')
-    parser.add_argument('--trunk_arch', type=str, default='fcn',choices=['fcn', 'cnn'],
+    parser.add_argument('--trunk_arch', type=str, default='fcn', choices=['fcn', 'cnn'],
                         help='Skill trunk architecture')
 
     # Model parameters
@@ -179,7 +182,7 @@ def init_argparser():
     parser.add_argument('--load_checkpoint',
                         help='The name of the checkpoint to load, usually an encoded time string')
     parser.add_argument('--resume',
-                        help='Indicates if training has to be resumed from the latest checkpoint', action='store_true',)
+                        help='Indicates if training has to be resumed from the given checkpoint', action='store_true',)
     parser.add_argument('--save_every', type=int,
                         help='Every how many batches the model should be saved', default=100)
     parser.add_argument('--print_every', type=int,
@@ -217,8 +220,18 @@ def validate_options(parser, opt):
     if opt.se:
         assert not opt.oc
     if opt.oc:
-        logging.warning("OPTION-CRITIC IS UNFINISHED AND SHOULD NOT BE USED YET")
+        logging.warning("OPTION-CRITIC IS UNFINISHED AND SHOULD NOT BE USED")
         assert not opt.se
+
+    if opt.resume and opt.load_checkpoint:
+        checkpoint = Path(opt.load_checkpoint)
+        logging.info(f"Resuming from checkpoint {checkpoint}")
+        assert checkpoint.exists()
+        vocab_file = checkpoint.parent.joinpath(VOCAB_FILENAME)
+        assert vocab_file.exists()
+        opt.vocab_file = str(vocab_file)
+    else:
+        opt.vocab_file = None
 
     torch.manual_seed(opt.seed)
     torch.cuda.manual_seed_all(opt.seed)
@@ -252,32 +265,42 @@ def get_model_name(opt):
     mem = "mem" if not opt.no_mem else "nomem"
     alg = "PPO" if not opt.oc else "PPOC"
     jobid = f'_job{opt.slurm_id}' if opt.slurm_id != 0 else ''
+    if opt.resume:
+        checkpoint = Path(opt.load_checkpoint)
+        prev_model_name = checkpoint.relative_to(opt.output_dir).parent
+        original_level = str(prev_model_name).split("_")[0]
+        res = f"RESUMED-{original_level}"
+    else:
+        res = ""
+
     if opt.se:
         mod = "SE"
         model_name_parts = {
             'alg': alg,
             'mod': mod,
             'env': opt.env_name,
+            'res': res,
             'mem': mem,
             'seed': opt.seed,
             'jobid': jobid,
             'suffix': suffix
-            }
-        return "{env}_{alg}_{mod}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+        }
+        return "{env}-{res}_{alg}_{mod}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
     else:
         mod = "AC"
         model_name_parts = {
             'alg': alg,
             'mod': mod,
             'env': opt.env_name,
+            'res': res,
             'arch': opt.arch,
             'instr': instr,
             'mem': mem,
             'seed': opt.seed,
             'jobid': jobid,
             'suffix': suffix
-            }
-        return "{env}_{alg}_{mod}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+        }
+        return "{env}-{res}_{alg}_{mod}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
 
 
 if __name__ == "__main__":
