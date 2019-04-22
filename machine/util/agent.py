@@ -4,8 +4,8 @@ from random import Random
 import torch
 
 import babyai
-from machine.models import ACModel
 from machine.util import RLCheckpoint
+
 
 class Agent(ABC):
     """An abstraction of the behavior of an agent. The agent is able:
@@ -54,7 +54,8 @@ class ModelAgent(Agent):
             self.memory = torch.zeros(
                 len(many_obs), self.model.memory_size, device=self.device)
         elif self.memory.shape[0] != len(many_obs):
-            raise ValueError("stick to one batch size for the lifetime of an agent")
+            raise ValueError(
+                "stick to one batch size for the lifetime of an agent")
         preprocessed_obs = self.obss_preprocessor(many_obs, device=self.device)
 
         with torch.no_grad():
@@ -98,7 +99,9 @@ class RandomAgent:
                 'dist': None,
                 'value': None}
 
+
 def load_agent(env, model_name, argmax=True, env_name=None, vocab=None):
     # env_name needs to be specified for demo agents
-    obss_preprocessor = babyai.utils.ObssPreprocessor(model_name, env.observation_space, load_vocab_from=vocab)
+    obss_preprocessor = babyai.utils.ObssPreprocessor(
+        model_name, env.observation_space, load_vocab_from=vocab)
     return ModelAgent(model_name, obss_preprocessor, argmax)

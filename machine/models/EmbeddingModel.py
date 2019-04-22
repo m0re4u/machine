@@ -10,10 +10,11 @@ from machine.util.mappings import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Function from https://github.com/ikostrikov/pytorch-a2c-ppo-acktr/blob/master/model.py
-
 
 def initialize_parameters(m):
+    """
+    Function from https://github.com/ikostrikov/pytorch-a2c-ppo-acktr/blob/master/model.py
+    """
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
         m.weight.data.normal_(0, 1)

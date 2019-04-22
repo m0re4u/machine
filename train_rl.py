@@ -1,7 +1,6 @@
 import argparse
 import datetime
 import logging
-import os
 from pathlib import Path
 
 import gym
@@ -9,6 +8,7 @@ import numpy as np
 import torch
 
 import babyai
+import machine
 from machine.models import ACModel, SkillEmbedding
 from machine.trainer import ReinforcementTrainer
 
@@ -58,6 +58,11 @@ def train_model():
         if torch.cuda.is_available():
             for m in model:
                 m.cuda()
+    elif opt.resume and (opt.se or opt.ac):
+        algo = 'ppo'
+        model = machine.util.RLCheckpoint.load_model(opt.load_checkpoint)
+        if torch.cuda.is_available():
+            model.cuda()
     elif opt.se:
         algo = 'ppo'
         model = SkillEmbedding(obss_preprocessor.obs_space['image'],

@@ -9,7 +9,7 @@ import dill
 import torch
 from torch.nn import DataParallel
 
-from machine.models import ACModel, SkillEmbedding
+import machine
 
 from .base_checkpoint import BaseCheckpoint
 
@@ -126,9 +126,8 @@ class Checkpoint(BaseCheckpoint):
                           path=path)
 
 
-
 class RLCheckpoint(BaseCheckpoint):
-    CHECKPOINT_NAME='check.pt'
+    CHECKPOINT_NAME = 'check.pt'
 
     def __init__(self, model, optimizer, status, obs, path=None):
         self.model = model
@@ -178,9 +177,9 @@ class RLCheckpoint(BaseCheckpoint):
         logger.info(f"Loading RLCheckpoint from {path}")
         state = torch.load(path, map_location=torch.device('cpu'))
         if "SE" in path:
-            model = SkillEmbedding(*state['model_params'])
+            model = machine.models.SkillEmbedding(*state['model_params'])
         elif "AC" in path:
-            model = ACModel(*state['model_params'])
+            model = machine.models.ACModel(*state['model_params'])
         else:
             logger.error("Error while assuming model")
 
