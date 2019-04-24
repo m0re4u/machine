@@ -7,3 +7,9 @@ models/*
 .vscode
 runs/
 *.out
+
+# Build folders
+build
+dist
+machine.egg-info
+

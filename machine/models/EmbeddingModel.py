@@ -70,7 +70,9 @@ class SkillEmbedding(BaseModel):
                               kernel_size=(3, 3), padding=1),
                     nn.BatchNorm2d(self.embedding_dim),
                     nn.ReLU(),
+                    nn.MaxPool2d(kernel_size=(2, 2), stride=2),
                     nn.MaxPool2d(kernel_size=(2, 2), stride=2)
+
                 ))
             else:
                 self.logger.error("Unknown skill trunk arch")
@@ -117,7 +119,10 @@ class SkillEmbedding(BaseModel):
                 # (batch, channel, height, width)
                 a = torch.transpose(torch.transpose(a, 1, 3), 2, 3)
 
-            h[mask] = self.skill_embeddings[i](a)
+            cnn_out = self.skill_embeddings[i](a)
+            cnn_out = cnn_out.reshape(cnn_out.shape[0], -1)
+
+            h[mask] = cnn_out
 
         act = self.policy(h)
         dist = Categorical(logits=F.log_softmax(act, dim=1))
