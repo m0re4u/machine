@@ -58,7 +58,7 @@ def train_model():
         if torch.cuda.is_available():
             for m in model:
                 m.cuda()
-    elif opt.resume and (opt.se or opt.ac):
+    elif opt.resume and (not opt.oc):
         algo = 'ppo'
         model = machine.util.RLCheckpoint.load_model(opt.load_checkpoint)
         if torch.cuda.is_available():
