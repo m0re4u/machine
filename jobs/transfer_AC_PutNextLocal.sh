@@ -20,6 +20,6 @@ python3 train_rl.py \
     --print_every 1 \
     --disrupt 0 \
     --resume \
-    --load_checkpoint models/BabyAI-GoToLocal-v0-_PPO_AC_expert_filmcnn_gru_mem_seed1_job2191361_19-04-23-14-17-40/006200_check.pt
+    --load_checkpoint models/BabyAI-GoToLocal-v0-_PPO_AC_expert_filmcnn_gru_mem_seed1_job2191361_19-04-23-14-17-40/006200_check.pt \
     --slurm_id $SLURM_JOB_ID \
     --tb
