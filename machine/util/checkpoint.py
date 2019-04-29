@@ -10,6 +10,7 @@ import torch
 from torch.nn import DataParallel
 
 import machine
+import machine.models
 
 from .base_checkpoint import BaseCheckpoint
 

@@ -253,6 +253,8 @@ def validate_options(parser, opt):
         config.pop('n_skills')
         config.pop('mapping')
         config.pop('trunk_arch')
+    if not config['resume']:
+        config.pop('load_checkpoint')
 
     for k, v in config.items():
         logging.info(f"  {k:>21} : {v}")

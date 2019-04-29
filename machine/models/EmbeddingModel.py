@@ -77,6 +77,10 @@ class SkillEmbedding(BaseModel):
             else:
                 self.logger.error("Unknown skill trunk arch")
 
+        if self.use_memory:
+            self.memory_rnn = nn.LSTMCell(self.embedding_dim, self.memory_dim)
+
+
         # Define actor's model
         self.policy = nn.Sequential(
             nn.Linear(self.embedding_dim, 64),
@@ -103,9 +107,11 @@ class SkillEmbedding(BaseModel):
             self.instr_mapping = ConstantMapping()
 
     def forward(self, obs, memory):
+        # Trunk selection
         skill_idx = self.instr_mapping(obs.instr)
-        h = torch.zeros((obs.instr.size()[0], self.embedding_dim)).to(
-            device=device)
+        h = torch.zeros((obs.instr.size()[0], self.embedding_dim)).to(device=device)
+
+        # Forward pass per trunk
         for i in range(self.n_skills):
             mask = (skill_idx == i)
             a = obs.image[mask]
@@ -121,8 +127,15 @@ class SkillEmbedding(BaseModel):
 
             cnn_out = self.skill_embeddings[i](a)
             cnn_out = cnn_out.reshape(cnn_out.shape[0], -1)
-
             h[mask] = cnn_out
+
+        # Update with memory
+        if self.use_memory:
+            hidden = (memory[:, :self.semi_memory_size],
+                      memory[:, self.semi_memory_size:])
+            hidden = self.memory_rnn(h, hidden)
+            h = hidden[0]
+            memory = torch.cat(hidden, dim=1)
 
         act = self.policy(h)
         dist = Categorical(logits=F.log_softmax(act, dim=1))
