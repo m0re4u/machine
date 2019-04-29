@@ -28,6 +28,9 @@ class ReinforcementTrainer(object):
         self.reshape_reward = reshape_reward
         self.logger = logging.getLogger(__name__)
         self.model_path = os.path.join(opt.output_dir, model_name)
+        if not os.path.exists(self.model_path):
+            self.logger.info(f"Created model path: {self.model_path}")
+            os.mkdir(self.model_path)
 
         # Copy command-line arguments to class
         self.frames = opt.frames

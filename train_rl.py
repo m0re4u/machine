@@ -63,6 +63,7 @@ def train_model():
         model = machine.util.RLCheckpoint.load_model(opt.load_checkpoint)
         if torch.cuda.is_available():
             model.cuda()
+        model.train()
     elif opt.se:
         algo = 'ppo'
         model = SkillEmbedding(obss_preprocessor.obs_space['image'],
