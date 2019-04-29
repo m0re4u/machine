@@ -23,5 +23,6 @@ python3 train_rl.py \
     --n_skills 4 \
     --mapping object \
     --trunk_arch cnn \
+    --no-mem \
     --slurm_id $SLURM_JOB_ID \
     --tb

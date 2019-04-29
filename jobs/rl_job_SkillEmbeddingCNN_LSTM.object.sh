@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -p gpu_shared
-#SBATCH -t 12:00:00
+#SBATCH -t 16:00:00
 #SBATCH --mem=12GB
 
 #SBATCH --mail-type=END
@@ -21,8 +21,7 @@ python3 train_rl.py \
     --disrupt 0 \
     --se \
     --n_skills 4 \
-    --mapping command \
+    --mapping object \
     --trunk_arch cnn \
-    --no-mem \
     --slurm_id $SLURM_JOB_ID \
     --tb
