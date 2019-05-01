@@ -56,10 +56,6 @@ class InstructionsPreprocessor(object):
 
         for obs in obss:
             tokens = self.segger.segment(obs["mission"].lower())
-            # print(a)
-            # tokens = re.findall("([a-z]+)", obs["mission"].lower())
-            # print(tokens)
-            # exit()
             instr = numpy.array([self.vocab[token] for token in tokens])
             raw_instrs.append(instr)
             max_instr_len = max(len(instr), max_instr_len)
