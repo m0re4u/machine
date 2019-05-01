@@ -18,7 +18,7 @@ pushd ${HOME}/machine/
 python3 train_rl.py \
     --env-name BabyAI-GoToLocal-v0 \
     --print_every 1 \
-    --segment_level words \
+    --segment_level word \
     --seed 1 \
     --slurm_id $SLURM_JOB_ID \
     --tb
