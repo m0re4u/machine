@@ -7,10 +7,10 @@ import gym
 import numpy as np
 import torch
 
-import babyai
 import machine
 from machine.models import ACModel, SkillEmbedding
 from machine.trainer import ReinforcementTrainer
+from machine.util import ObssPreprocessor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -43,8 +43,8 @@ def train_model():
     model_name = get_model_name(opt)
 
     # Observation preprocessor
-    obss_preprocessor = babyai.utils.ObssPreprocessor(
-        model_name, envs[0].observation_space, load_vocab_from=opt.vocab_file)
+    obss_preprocessor = ObssPreprocessor(
+        model_name, envs[0].observation_space, load_vocab_from=opt.vocab_file, segment_level=opt.segment_level)
     obss_preprocessor.vocab.save()
 
     def reshape_reward(_0, _1, reward, _2): return opt.reward_scale * reward
@@ -166,6 +166,10 @@ def init_argparser():
                         help='What mapping to use to select the skill trunks')
     parser.add_argument('--trunk_arch', type=str, default='fcn', choices=['fcn', 'cnn'],
                         help='Skill trunk architecture')
+
+    # Segmentation arguments
+    parser.add_argument('--segment_level', type=str, default='word', choices=['word', 'segment', 'word_annotated'],
+                        help='Segmentation level')
 
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
