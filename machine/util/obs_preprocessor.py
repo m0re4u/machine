@@ -43,7 +43,12 @@ class Vocabulary:
 class InstructionsPreprocessor(object):
     def __init__(self, model_name, load_vocab_from=None, segment_level='word', vocab_path='models'):
         self.model_name = model_name
-        self.segger = Segmenter(model_name.split('_')[0][:-1], segment_level)
+        m = model_name.split('_')[0][:-1]
+        if 'RESUMED' in m:
+            parts = m.partition("-RESUMED-")
+            m = parts[0]
+
+        self.segger = Segmenter(m, segment_level)
         if load_vocab_from is not None and os.path.exists(load_vocab_from):
             self.vocab = Vocabulary(load_vocab_from)
         else:
