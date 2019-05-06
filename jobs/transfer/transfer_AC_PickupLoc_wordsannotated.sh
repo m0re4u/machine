@@ -19,8 +19,8 @@ python3 train_rl.py \
     --env-name BabyAI-PickupLoc-v0 \
     --print_every 1 \
     --segment_level word_annotated \
-    --seed 1 \
+    --seed 42 \
     --slurm_id $SLURM_JOB_ID \
     --resume \
-    --load_checkpoint models/BabyAI-GoToLocal-v0-_PPO_AC_expert_filmcnn_gru_mem_seed1_job2239330_19-05-01-13-58-20/008900_check.pt \
+    --load_checkpoint models/BabyAI-GoToLocal-v0-_PPO_AC_expert_filmcnn_gru_mem_seed42_job2262965_19-05-05-14-08-11/009000_check.pt \
     --tb

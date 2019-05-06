@@ -19,6 +19,6 @@ python3 train_rl.py \
     --env-name BabyAI-GoToLocal-v0 \
     --print_every 1 \
     --segment_level word_annotated \
-    --seed 1 \
+    --seed 42 \
     --slurm_id $SLURM_JOB_ID \
     --tb
