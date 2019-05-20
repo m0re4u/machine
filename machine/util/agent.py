@@ -34,13 +34,17 @@ class Agent(ABC):
 class ModelAgent(Agent):
     """A model-based agent. This agent behaves using a model."""
 
-    def __init__(self, model_or_name, obss_preprocessor, argmax):
+    def __init__(self, model_or_name, obss_preprocessor, argmax, partial=False):
+        self.partial = partial
         if obss_preprocessor is None:
             assert isinstance(model_or_name, str)
             obss_preprocessor = babyai.utils.ObssPreprocessor(model_or_name)
         self.obss_preprocessor = obss_preprocessor
         if isinstance(model_or_name, str):
-            self.model = RLCheckpoint.load_model(model_or_name)
+            if self.partial:
+                self.model = RLCheckpoint.load_partial_model(model_or_name)
+            else:
+                self.model = RLCheckpoint.load_model(model_or_name)
             if torch.cuda.is_available():
                 self.model.cuda()
         else:
@@ -62,6 +66,8 @@ class ModelAgent(Agent):
             model_results = self.model(preprocessed_obs, self.memory)
             dist = model_results['dist']
             value = model_results['value']
+            if self.partial:
+                reason = model_results['reason']
             self.memory = model_results['memory']
 
         if self.argmax:
@@ -69,9 +75,15 @@ class ModelAgent(Agent):
         else:
             action = dist.sample()
 
-        return {'action': action,
-                'dist': dist,
-                'value': value}
+        if self.partial:
+            return {'action': action,
+                    'dist': dist,
+                    'value': value,
+                    'reason': reason}
+        else:
+            return {'action': action,
+                    'dist': dist,
+                    'value': value}
 
     def act(self, obs):
         return self.act_batch([obs])
@@ -100,8 +112,8 @@ class RandomAgent:
                 'value': None}
 
 
-def load_agent(env, model_name, argmax=True, env_name=None, vocab=None):
+def load_agent(env, model_name, argmax=True, env_name=None, vocab=None, partial=False):
     # env_name needs to be specified for demo agents
     obss_preprocessor = babyai.utils.ObssPreprocessor(
         model_name, env.observation_space, load_vocab_from=vocab)
-    return ModelAgent(model_name, obss_preprocessor, argmax)
+    return ModelAgent(model_name, obss_preprocessor, argmax, partial=partial)

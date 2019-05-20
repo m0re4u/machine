@@ -22,16 +22,18 @@ def main(args):
     # Define agent
     env = gym.make(args.env)
     env.seed(args.seed)
-
-    agent = machine.util.load_agent(env, args.model, env_name=args.env, vocab=args.vocab)
+    partial = (args.reasoning == 'diagnostic' or args.reasoning == 'model')
+    agent = machine.util.load_agent(env, args.model, env_name=args.env, vocab=args.vocab, partial=partial)
 
     obs = env.reset()
     while True:
         time.sleep(args.pause)
         result = agent.act(obs)
+        print(result)
         obs, reward, done, _ = env.step(result['action'])
         if done:
             print(f"Mission: {obs['mission']:50} - reward: {reward}")
+            exit()
             obs = env.reset()
 
 
@@ -49,6 +51,8 @@ if __name__ == "__main__":
                         help="random seed")
     parser.add_argument("--pause", type=float, default=0.1,
                     help="the pause between two consequent actions of an agent")
+    parser.add_argument("--reasoning", type=str, default=None, choices=['diagnostic','model'],
+                    help="Reasoning to ask the agent for")
     args = parser.parse_args()
 
     main(args)

@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 import machine
-from machine.models import ACModel, SkillEmbedding
+from machine.models import ACModel, IACModel, SkillEmbedding
 from machine.trainer import ReinforcementTrainer
 from machine.util import ObssPreprocessor
 
