@@ -5,8 +5,10 @@ machine/tasks/*/data/
 machine/tasks/LongLookupTables/*/data/
 models/*
 .vscode
+data/
 runs/
 *.out
+*.log
 
 # Build folders
 build

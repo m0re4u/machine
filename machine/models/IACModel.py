@@ -16,8 +16,10 @@ class IACModel(ACModel):
                          instr_dim, use_instr, lang_model, use_memory, arch)
         self.reasoning = nn.Sequential(
             nn.Linear(self.embedding_size, 2),
+            nn.ReLU(),
             nn.Softmax(dim=1)
         )
+        self.emb = None
 
     @property
     def model_hyperparameters(self):
@@ -72,6 +74,7 @@ class IACModel(ACModel):
         if self.use_instr and not "filmcnn" in self.arch:
             embedding = torch.cat((embedding, instr_embedding), dim=1)
 
+        self.embedding = embedding
         x = self.actor(embedding)
         dist = Categorical(logits=F.log_softmax(x, dim=1))
 

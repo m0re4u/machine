@@ -62,13 +62,12 @@ class ModelAgent(Agent):
                 "stick to one batch size for the lifetime of an agent")
         preprocessed_obs = self.obss_preprocessor(many_obs, device=self.device)
 
-        with torch.no_grad():
-            model_results = self.model(preprocessed_obs, self.memory)
-            dist = model_results['dist']
-            value = model_results['value']
-            if self.partial:
-                reason = model_results['reason']
-            self.memory = model_results['memory']
+        model_results = self.model(preprocessed_obs, self.memory)
+        dist = model_results['dist']
+        value = model_results['value']
+        if self.partial:
+            reason = model_results['reason']
+        self.memory = model_results['memory']
 
         if self.argmax:
             action = dist.probs.max(1, keepdim=True)[1]
