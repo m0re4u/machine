@@ -10,7 +10,7 @@ class IACModel(ACModel):
     def __init__(self, obs_space, action_space,
                  image_dim=128, memory_dim=128, instr_dim=128,
                  use_instr=False, lang_model="gru", use_memory=False,
-                 arch="cnn1", diagnostic=False):
+                 arch="cnn1"):
 
         super().__init__(obs_space, action_space, image_dim, memory_dim,
                          instr_dim, use_instr, lang_model, use_memory, arch)
@@ -33,7 +33,6 @@ class IACModel(ACModel):
             self.lang_model,
             self.use_memory,
             self.arch,
-            self.diagnostic
         ]
 
     def forward(self, obs, memory, instr_embedding=None):

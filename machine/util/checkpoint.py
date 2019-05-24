@@ -191,10 +191,14 @@ class RLCheckpoint(BaseCheckpoint):
 
     @classmethod
     def load_partial_model(cls, path):
+        """
+        Load a partial model, only load in the layers that exists in the saved
+        model and in IACModel.
+        """
         logger = logging.getLogger(__name__)
         logger.warn(f"Loading partial RLCheckpoint from {path}")
         state = torch.load(path, map_location=torch.device('cpu'))
-        model = machine.models.IACModel(*state['model_params'], diagnostic=True)
+        model = machine.models.IACModel(*state['model_params'])
         model.load_state_dict(state['model'], strict=False)
         model.eval()
         return model

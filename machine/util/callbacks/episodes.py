@@ -3,7 +3,7 @@ import os
 import time
 
 import numpy as np
-
+from collections import defaultdict
 from machine.util.callbacks import Callback
 from machine.util.checkpoint import RLCheckpoint
 
@@ -22,7 +22,7 @@ class EpisodeLogger(Callback):
         - batch: Batches in update_parameters()
     """
 
-    def __init__(self, print_every=10, save_every=10, model_name='', use_tensorboard=False, explore_for=100):
+    def __init__(self, print_every=10, save_every=10, model_name='', use_tensorboard=False, explore_for=100, reasoning=False):
         super(EpisodeLogger, self).__init__()
 
         self.logger = logging.getLogger("EpisodeLogger")
@@ -42,58 +42,33 @@ class EpisodeLogger(Callback):
         self.num_frames = 0
         self.num_episodes = 0
         self.explore_for = explore_for
+        self.reasoning = reasoning
 
     def set_trainer(self, trainer):
         self.trainer = trainer
 
     def on_epoch_begin(self, info=None):
         self.logger.info(f"Start of epoch: {info}")
-        self.log_entropies = []
-        self.log_values = []
-        self.log_policy_losses = []
-        self.log_value_losses = []
-        self.log_grad_norms = []
-        self.log_losses = []
-        self.log_disrupts = []
+        self.scalars = defaultdict(lambda: [])
 
     def on_epoch_end(self, logs=None, info=None):
         if logs is not None:
-            # Log some values
-            logs["entropy"] = np.mean(self.log_entropies)
-            logs["value"] = np.mean(self.log_values)
-            logs["policy_loss"] = np.mean(self.log_policy_losses)
-            logs["value_loss"] = np.mean(self.log_value_losses)
-            logs["grad_norm"] = np.mean(self.log_grad_norms)
-            logs["loss"] = np.mean(self.log_losses)
-            logs["disrupts"] = np.mean(self.log_disrupts)
-            return logs
+            new_logs = defaultdict(lambda: 0)
+            for k, v in self.scalars.items():
+                new_logs[k] = np.mean(v)
+            new_logs.update(logs)
+            return new_logs
         else:
             pass
 
     def on_batch_begin(self, batch, info=None):
-        batch_entropy = 0
-        batch_value = 0
-        batch_policy_loss = 0
-        batch_value_loss = 0
-        batch_loss = 0
-        batch_disrupt = 0
-        return {
-            'entropy': batch_entropy,
-            'value': batch_value,
-            'policy_loss': batch_policy_loss,
-            'value_loss': batch_value_loss,
-            'loss': batch_loss,
-            'disrupt': batch_disrupt
-        }
+        batch_scalars = defaultdict(lambda: 0)
+        return batch_scalars
 
     def on_batch_end(self, loss, info=None):
-        self.log_losses.append(loss.item())
-        self.log_entropies.append(info['entropy'])
-        self.log_values.append(info['value'])
-        self.log_policy_losses.append(info['policy_loss'])
-        self.log_value_losses.append(info['value_loss'])
-        self.log_disrupts.append(info['disrupt'].item())
-        self.log_grad_norms.append(info['grad_norm'].item())
+        for k, v in info.items():
+            self.scalars[k].append(v)
+        self.scalars['loss'].append(loss)
 
     def on_train_begin(self, info=None):
         self.logger.info("Starting training")
@@ -107,7 +82,8 @@ class EpisodeLogger(Callback):
     def on_cycle_start(self):
         self.cycle_start_time = time.time()
         reward_origin = 'intrinsic' if self.num_frames < self.explore_for else 'advantage'
-        self.logger.info(f"Start of cycle: {self.cycle} - Reward from: {reward_origin}")
+        self.logger.info(
+            f"Start of cycle: {self.cycle} - Reward from: {reward_origin}")
 
     def on_cycle_end(self, logs=None):
         self.cycle += 1
@@ -148,7 +124,8 @@ class EpisodeLogger(Callback):
             check = RLCheckpoint(
                 self.trainer.model,
                 self.trainer.optimizer,
-                {'i':self.cycle, 'num_frames':self.num_frames, 'num_episodes':self.num_episodes},
+                {'i': self.cycle, 'num_frames': self.num_frames,
+                    'num_episodes': self.num_episodes},
                 self.trainer.preprocess_obss,
                 self.trainer.model_path
             )
@@ -158,11 +135,18 @@ class EpisodeLogger(Callback):
             self.writer.add_scalar('train/fps', fps, self.cycle)
             self.writer.add_scalar(
                 'train/succes_rate', success_per_episode['mean'], self.cycle)
-            self.writer.add_scalar('train/episode_length', num_frames_per_episode['mean'], self.cycle)
-            self.writer.add_scalar('train/disrupt', logs["disrupts"], self.cycle)
+            self.writer.add_scalar(
+                'train/episode_length', num_frames_per_episode['mean'], self.cycle)
+            self.writer.add_scalar(
+                'train/disrupt', logs["disrupts"], self.cycle)
             self.writer.add_scalar('train/loss', logs["loss"], self.cycle)
-            self.writer.add_scalar('train/policy_loss', logs["policy_loss"], self.cycle)
-            self.writer.add_scalar('train/value_loss', logs["value_loss"], self.cycle)
+            self.writer.add_scalar('train/policy_loss',
+                                   logs["policy_loss"], self.cycle)
+            self.writer.add_scalar(
+                'train/value_loss', logs["value_loss"], self.cycle)
+            if self.reasoning:
+                self.writer.add_scalar(
+                    'train/reason_loss', logs['reason_loss'], self.cycle)
 
 
 def get_stats(arr):

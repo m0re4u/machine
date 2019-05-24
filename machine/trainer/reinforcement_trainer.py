@@ -20,7 +20,7 @@ class ReinforcementTrainer(object):
     Largely inspired by babyAI repo code for PPOAlgo
     """
 
-    def __init__(self, envs, opt, model, model_name, obs, reshape_reward, algo_name='ppo'):
+    def __init__(self, envs, opt, model, model_name, obs, reshape_reward, algo_name='ppo', reasoning=False):
         self._trainer = f"Reinforcement Trainer - algorithm: {algo_name}"
         self._algo = algo_name
         self.env = envs
@@ -56,8 +56,13 @@ class ReinforcementTrainer(object):
         self.disrupt_mode = opt.disrupt
         self.disrupt_coef = opt.disrupt_coef
 
+        # Argument for reasoning
+        self.reasoning = reasoning
+        if self.reasoning:
+            self.reason_criterion = torch.nn.CrossEntropyLoss()
+
         # Initialize observations
-        self.obs = self.env.reset()
+        self.obs, self.obs_info = self.env.reset()
         self.obss = [None] * self.frames_per_proc
 
         # Initialize log variables
@@ -65,7 +70,7 @@ class ReinforcementTrainer(object):
 
         # Initialize callbacks
         self.callback = EpisodeLogger(
-            opt.print_every, opt.save_every, model_name, opt.tb, opt.explore_for)
+            opt.print_every, opt.save_every, model_name, opt.tb, opt.explore_for, opt.reasoning)
         self.callback.set_trainer(self)
 
         # Set parameters for specific algorithms
@@ -126,20 +131,23 @@ class ReinforcementTrainer(object):
                 dist = model_results['dist']
                 value = model_results['value']
                 memory = model_results['memory']
+                if self.reasoning:
+                    self.reason = self._get_reason()
+                    # val, idx = model_results['reason'].max(dim=1)
+                    # self.reason_results = (self.reason == idx)
+
 
             action = dist.sample()
 
             obs, reward, done, env_info = self.env.step(action.cpu().numpy())
-            # TODO: reward - c_t
 
             # Update experiences values
             self.update_memory(i, action, value, obs, reward, done)
             self.obs = obs
+            self.obs_info = env_info
             self.memory = memory
             self.mask = 1 - \
                 torch.tensor(done, device=device, dtype=torch.float)
-
-            # Check if option terminates in new state: self.obs
 
             # Update log values
             self.update_log_values(i, dist, action, reward, done)
@@ -185,8 +193,8 @@ class ReinforcementTrainer(object):
                     memory = model_results['memory']
 
                     disrupt_val = torch.tensor(1)
-                    if i < self.recurrence - 1:
-                        if self.disrupt_mode > 0:
+                    if self.disrupt_mode > 0:
+                        if i < self.recurrence - 1:
                             s1 = sb.obs.image
                             s2 = exps[inds + i + 1].obs.image
                             disrupt_val = torch.sum(
@@ -218,6 +226,11 @@ class ReinforcementTrainer(object):
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef *
                                        (value_loss * disrupt_val))
+                    elif self.reasoning:
+                        reason_loss = self.reason_criterion(model_results['reason'], sb.reasons.type(torch.long))
+                        loss = policy_loss - self.entropy_coef * \
+                            entropy + (self.value_loss_coef * value_loss) + \
+                            reason_loss
                     else:
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef * value_loss)
@@ -230,7 +243,10 @@ class ReinforcementTrainer(object):
                     batch_logs['value'] += value.mean().item()
                     batch_logs['policy_loss'] += policy_loss.item()
                     batch_logs['value_loss'] += value_loss.item()
-                    batch_logs['disrupt'] += disrupt_val
+                    batch_logs['disrupt'] += disrupt_val.item()
+                    if self.reasoning:
+                        batch_logs['reason_loss'] += reason_loss.item()
+
 
                     # Update memories for next epoch
                     if i < self.recurrence - 1:
@@ -245,6 +261,8 @@ class ReinforcementTrainer(object):
                 batch_logs['policy_loss'] /= self.recurrence
                 batch_logs['value_loss'] /= self.recurrence
                 batch_logs['disrupt'] /= self.recurrence
+                if self.reasoning:
+                    batch_logs['reason'] /= self.recurrence
 
                 # Update actor-critic
                 self.optimizer.zero_grad()
@@ -256,9 +274,8 @@ class ReinforcementTrainer(object):
                 self.optimizer.step()
 
                 # Update log values
-                batch_logs['grad_norm'] = grad_norm
-                self.callback.on_batch_end(batch_loss, batch_logs)
-
+                batch_logs['grad_norm'] = grad_norm.item()
+                self.callback.on_batch_end(batch_loss.item(), batch_logs)
             logs = self.callback.on_epoch_end(logs)
         return logs
 
@@ -305,6 +322,10 @@ class ReinforcementTrainer(object):
         self.advantages = torch.zeros(*shape, device=device)
         self.log_probs = torch.zeros(*shape, device=device)
 
+        if self.reasoning:
+            self.reason = torch.zeros(shape[1], device=device)
+            self.reasons = torch.zeros(*shape, device=device)
+
         if self._algo == 'ppoc':
             self.c_t = torch.zeros(shape[1], device=device)
 
@@ -339,6 +360,9 @@ class ReinforcementTrainer(object):
             ], device=device)
         else:
             self.rewards[i] = torch.tensor(reward, device=device)
+
+        if self.reasoning:
+            self.reasons[i] = self.reason
 
     def update_log_values(self, i, dist, action, reward, done):
         """
@@ -442,6 +466,9 @@ class ReinforcementTrainer(object):
         exps.returnn = exps.value + exps.advantage
         exps.log_prob = self.log_probs.transpose(0, 1).reshape(-1)
 
+        if self.reasoning:
+            exps.reasons = self.reasons.transpose(0, 1).reshape(-1)
+
         # Preprocess experiences
         exps.obs = self.preprocess_obss(exps.obs, device=device)
         return exps
@@ -485,3 +512,12 @@ class ReinforcementTrainer(object):
                                     for i in range(0, len(indexes), num_indexes)]
 
         return batches_starting_indexes
+
+    def _get_reason(self):
+        """
+        Extract a tensor containing the correctly reason label from the
+        observation info.
+        """
+        task_status = [x['status'] for x in self.obs_info]
+        res = [l.index('continue') for l in task_status]
+        return torch.Tensor(res).type(torch.long)

@@ -58,6 +58,14 @@ def train_model():
         if torch.cuda.is_available():
             for m in model:
                 m.cuda()
+    elif opt.reasoning:
+        algo = 'ppo'
+        model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                                opt.image_dim, opt.memory_dim, opt.instr_dim,
+                                not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+        if torch.cuda.is_available():
+            model.cuda()
+        model.train()
     elif opt.resume and (not opt.oc):
         algo = 'ppo'
         model = machine.util.RLCheckpoint.load_model(opt.load_checkpoint)
@@ -81,7 +89,7 @@ def train_model():
             model.cuda()
 
     trainer = ReinforcementTrainer(
-        p_envs, opt, model, model_name, obss_preprocessor, reshape_reward, algo)
+        p_envs, opt, model, model_name, obss_preprocessor, reshape_reward, algo, opt.reasoning)
 
     # Start training
     trainer.train()
@@ -171,6 +179,10 @@ def init_argparser():
     parser.add_argument('--segment_level', type=str, default='word', choices=['word', 'segment', 'word_annotated'],
                         help='Segmentation level')
 
+    # Reasoning arguments
+    parser.add_argument('--reasoning', default=False, action='store_true',
+                        help='Turn on training with reasoning')
+
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
                         help="dimensionality of the image embedding")
@@ -225,15 +237,17 @@ def validate_options(parser, opt):
         logging.info(f"CUDA device set to {opt.cuda_device}")
         torch.cuda.set_device(opt.cuda_device)
     else:
-        logging.info("CUDA not available")
+        logging.info("CUDA is not available")
 
     # Option-Critic and SkillEmbedding are mutually exclusive
     if opt.se:
         assert not opt.oc
     if opt.oc:
-        logging.warning("OPTION-CRITIC IS UNFINISHED AND SHOULD NOT BE USED")
+        logging.error("OPTION-CRITIC IS UNFINISHED AND SHOULD NOT BE USED")
         assert not opt.se
+        exit(1)
 
+    # Loading in of pretrained model
     if opt.resume and opt.load_checkpoint:
         checkpoint = Path(opt.load_checkpoint)
         logging.info(f"Resuming from checkpoint {checkpoint}")
@@ -244,6 +258,7 @@ def validate_options(parser, opt):
     else:
         opt.vocab_file = None
 
+    # Setting random seeds
     torch.manual_seed(opt.seed)
     torch.cuda.manual_seed_all(opt.seed)
     np.random.seed(opt.seed)
@@ -299,6 +314,22 @@ def get_model_name(opt):
             'suffix': suffix
         }
         return "{env}-{res}_{alg}_{mod}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+    elif opt.reasoning:
+        mod = "IAC"
+        model_name_parts = {
+            'alg': alg,
+            'mod': mod,
+            'env': opt.env_name,
+            'res': res,
+            'arch': opt.arch,
+            'instr': instr,
+            'mem': mem,
+            'seed': opt.seed,
+            'jobid': jobid,
+            'suffix': suffix
+        }
+        return "{env}-{res}_{alg}_{mod}_{arch}_{instr}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+
     else:
         mod = "AC"
         model_name_parts = {
