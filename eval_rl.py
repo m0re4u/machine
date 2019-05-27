@@ -23,11 +23,12 @@ def main(args):
     # Define agent and load in parts of the networks
     partial = (args.reasoning == 'diagnostic' or args.reasoning == 'model')
     agent = machine.util.load_agent(env, args.model, env_name=args.env, vocab=args.vocab, partial=partial)
+
     for name, param in agent.model.named_parameters():
         if 'reasoning' not in name:
             # Freeze layers we do not wish to train
             param.requires_grad = False
-        if 'reasoning' in name and args.diag_model is not None:
+        if args.reasoning == 'reasoning' and 'reasoning' in name and args.diag_model is not None:
             # Load trained diagnostic classifier
             state = torch.load(args.diag_model)
             param.data.copy_(state[name.partition('.')[2]])
@@ -107,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument("--vocab", default=None, required=True,
                     help="vocabulary file (REQUIRED)")
     parser.add_argument("--episodes", type=int, default=10,
-                        help="number of episodes of evaluation (default: 1000)")
+                        help="number of episodes of evaluation (default: 10)")
     parser.add_argument("--seed", type=int, default=int(1e9),
                         help="random seed")
     parser.add_argument("--pause", type=float, default=0,
