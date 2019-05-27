@@ -17,7 +17,7 @@ class IACModel(ACModel):
         self.reasoning = nn.Sequential(
             nn.Linear(self.embedding_size, 2),
             nn.ReLU(),
-            nn.Softmax(dim=1)
+            nn.LogSoftmax(dim=1)
         )
         self.emb = None
 
