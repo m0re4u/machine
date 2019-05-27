@@ -65,6 +65,7 @@ def main(args):
 
         # Perform action
         obs, reward, done, info = env.step(result['action'])
+        agent.memory *= (1 - done)
         if done:
             # Upon episode completion
             if args.gather:

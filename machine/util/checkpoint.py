@@ -199,6 +199,8 @@ class RLCheckpoint(BaseCheckpoint):
         logger.warn(f"Loading partial RLCheckpoint from {path}")
         state = torch.load(path, map_location=torch.device('cpu'))
         model = machine.models.IACModel(*state['model_params'])
-        model.load_state_dict(state['model'], strict=False)
+        missing, unexp = model.load_state_dict(state['model'], strict=False)
+        if missing != [] or unexp != []:
+            logger.warn(f"Missing keys: {missing} - Unexpected keys: {unexp}")
         model.eval()
         return model
