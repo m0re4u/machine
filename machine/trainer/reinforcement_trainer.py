@@ -1,5 +1,6 @@
 import logging
 import os
+from itertools import product
 
 import numpy
 import torch
@@ -10,6 +11,10 @@ from machine.models import PolicyMapping, SigmoidTermination
 from machine.util.callbacks import EpisodeLogger
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+OBJ_TYPES = ['box', 'ball', 'key']
+COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey']
+obj_list = list(product(COLORS, OBJ_TYPES))
+mapping = {" ".join(k): v for v, k in enumerate(obj_list)}
 
 
 class ReinforcementTrainer(object):
@@ -519,11 +524,21 @@ class ReinforcementTrainer(object):
 
         return batches_starting_indexes
 
-    def _get_reason(self):
+    def _get_reason(self, index_only=False):
         """
         Extract a tensor containing the correctly reason label from the
         observation info.
+
+        if index_only is True, only give the index of the segment the agent
+        should be aiming for. If False, give the index of the segment out of
+        all possible color-object combinations.
         """
         task_status = [x['status'] for x in self.obs_info]
         res = [l.index('continue') for l in task_status]
-        return torch.Tensor(res).type(torch.long)
+        if index_only:
+            return torch.Tensor(res).type(torch.long)
+        else:
+            instructions = [x['mission'] for x in self.obs]
+            split_instr = [i.split('then') for i in instructions]
+            idx = [mapping[split[label].replace("go to the", "").strip()] for label, split in zip(res,split_instr)]
+            return torch.Tensor(idx).type(torch.long)
