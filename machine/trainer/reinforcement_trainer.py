@@ -536,9 +536,9 @@ class ReinforcementTrainer(object):
         task_status = [x['status'] for x in self.obs_info]
         res = [l.index('continue') for l in task_status]
         if index_only:
-            return torch.Tensor(res).type(torch.long)
+            return torch.Tensor(res, device=device).type(torch.long)
         else:
             instructions = [x['mission'] for x in self.obs]
             split_instr = [i.split('then') for i in instructions]
             idx = [mapping[split[label].replace("go to the", "").strip()] for label, split in zip(res,split_instr)]
-            return torch.Tensor(idx).type(torch.long)
+            return torch.Tensor(idx, device=device).type(torch.long)
