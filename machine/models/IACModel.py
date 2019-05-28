@@ -15,7 +15,7 @@ class IACModel(ACModel):
         super().__init__(obs_space, action_space, image_dim, memory_dim,
                          instr_dim, use_instr, lang_model, use_memory, arch)
         self.reasoning = nn.Sequential(
-            nn.Linear(self.embedding_size, 2),
+            nn.Linear(self.embedding_size, 18),
             nn.ReLU(),
             nn.LogSoftmax(dim=1)
         )

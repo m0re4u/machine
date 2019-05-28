@@ -1,5 +1,6 @@
 import logging
 import os
+from itertools import product
 
 import numpy
 import torch
@@ -10,6 +11,10 @@ from machine.models import PolicyMapping, SigmoidTermination
 from machine.util.callbacks import EpisodeLogger
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+OBJ_TYPES = ['box', 'ball', 'key']
+COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey']
+obj_list = list(product(COLORS, OBJ_TYPES))
+mapping = {" ".join(k): v for v, k in enumerate(obj_list)}
 
 
 class ReinforcementTrainer(object):
@@ -59,7 +64,7 @@ class ReinforcementTrainer(object):
         # Argument for reasoning
         self.reasoning = reasoning
         if self.reasoning:
-            self.reason_criterion = torch.nn.CrossEntropyLoss()
+            self.reason_criterion = torch.nn.NLLLoss()
 
         # Initialize observations
         self.obs, self.obs_info = self.env.reset()
@@ -133,8 +138,8 @@ class ReinforcementTrainer(object):
                 memory = model_results['memory']
                 if self.reasoning:
                     self.reason = self._get_reason()
-                    # val, idx = model_results['reason'].max(dim=1)
-                    # self.reason_results = (self.reason == idx)
+                    val, idx = model_results['reason'].max(dim=1)
+                    self.reason_results = torch.sum(self.reason == idx)
 
 
             action = dist.sample()
@@ -343,6 +348,8 @@ class ReinforcementTrainer(object):
         self.log_return = [0] * self.num_procs
         self.log_reshaped_return = [0] * self.num_procs
         self.log_num_frames = [0] * self.num_procs
+        if self.reasoning:
+            self.log_reason_results = [0] * self.num_procs
 
     def update_memory(self, i, action, value, obs, reward, done):
         """
@@ -374,6 +381,8 @@ class ReinforcementTrainer(object):
         self.log_episode_reshaped_return += self.rewards[i]
         self.log_episode_num_frames += torch.ones(
             self.num_procs, device=device)
+        if self.reasoning:
+            self.log_reason_results.append(self.reason_results.item() / self.num_procs)
 
         for j, done_ in enumerate(done):
             if done_:
@@ -381,8 +390,7 @@ class ReinforcementTrainer(object):
                 self.log_return.append(self.log_episode_return[j].item())
                 self.log_reshaped_return.append(
                     self.log_episode_reshaped_return[j].item())
-                self.log_num_frames.append(
-                    self.log_episode_num_frames[j].item())
+                self.log_num_frames.append(self.log_episode_num_frames[j].item())
 
         self.log_episode_return *= self.mask
         self.log_episode_reshaped_return *= self.mask
@@ -490,6 +498,9 @@ class ReinforcementTrainer(object):
         self.log_return = self.log_return[-self.num_procs:]
         self.log_reshaped_return = self.log_reshaped_return[-self.num_procs:]
         self.log_num_frames = self.log_num_frames[-self.num_procs:]
+        if self.reasoning:
+            log['correct_reasons'] = self.log_reason_results[-keep:]
+            self.log_reason_results = self.log_reason_results[-self.num_procs:]
         return log
 
     def _get_batches_starting_indexes(self):
@@ -513,11 +524,21 @@ class ReinforcementTrainer(object):
 
         return batches_starting_indexes
 
-    def _get_reason(self):
+    def _get_reason(self, index_only=False):
         """
         Extract a tensor containing the correctly reason label from the
         observation info.
+
+        if index_only is True, only give the index of the segment the agent
+        should be aiming for. If False, give the index of the segment out of
+        all possible color-object combinations.
         """
         task_status = [x['status'] for x in self.obs_info]
         res = [l.index('continue') for l in task_status]
-        return torch.Tensor(res).type(torch.long)
+        if index_only:
+            return torch.Tensor(res).type(torch.long)
+        else:
+            instructions = [x['mission'] for x in self.obs]
+            split_instr = [i.split('then') for i in instructions]
+            idx = [mapping[split[label].replace("go to the", "").strip()] for label, split in zip(res,split_instr)]
+            return torch.Tensor(idx).type(torch.long)

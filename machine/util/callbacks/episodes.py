@@ -146,6 +146,8 @@ class EpisodeLogger(Callback):
                 'train/value_loss', logs["value_loss"], self.cycle)
             if self.reasoning:
                 self.writer.add_scalar(
+                    'train/reason_correct_rate', get_stats(logs['correct_reasons'])['mean'], self.cycle)
+                self.writer.add_scalar(
                     'train/reason_loss', logs['reason_loss'], self.cycle)
 
 
