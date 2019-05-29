@@ -181,6 +181,7 @@ class ACModel(BaseModel):
 
         # Initialize parameters correctly
         self.reset_parameters()
+        self.embedding = None
 
     @property
     def memory_size(self):
@@ -245,6 +246,7 @@ class ACModel(BaseModel):
         if self.use_instr and not "filmcnn" in self.arch:
             embedding = torch.cat((embedding, instr_embedding), dim=1)
 
+        self.embedding = embedding
         x = self.actor(embedding)
         dist = Categorical(logits=F.log_softmax(x, dim=1))
 

@@ -19,7 +19,7 @@ class IACModel(ACModel):
             nn.ReLU(),
             nn.LogSoftmax(dim=1)
         )
-        self.emb = None
+        self.embedding = None
 
     @property
     def model_hyperparameters(self):
