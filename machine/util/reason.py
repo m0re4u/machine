@@ -13,6 +13,12 @@ def get_reason(obs, obs_info, index_only=False):
         Extract a tensor containing the correctly reason label from the
         observation info.
 
+        TODO: get label on type on instruction:
+            - Before
+            - After
+            - And
+            - Or
+
         if index_only is True, only give the index of the segment the agent
         should be aiming for. If False, give the index of the segment out of
         all possible color-object combinations.

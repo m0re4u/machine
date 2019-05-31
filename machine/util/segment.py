@@ -41,7 +41,10 @@ words_to_wordtype = {
     'front': SegmentType.NOUN,
     'you': SegmentType.NOUN,
     'behind': SegmentType.NOUN,
-    'then': SegmentType.PROP
+    'then': SegmentType.PROP,
+    'and': SegmentType.PROP,
+    'or': SegmentType.PROP,
+    'after': SegmentType.PROP
 }
 
 colors = set([
