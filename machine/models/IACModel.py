@@ -10,7 +10,7 @@ class IACModel(ACModel):
     def __init__(self, obs_space, action_space,
                  image_dim=128, memory_dim=128, instr_dim=128,
                  use_instr=False, lang_model="gru", use_memory=False,
-                 arch="cnn1"):
+                 arch="cnn1", detach=False):
 
         super().__init__(obs_space, action_space, image_dim, memory_dim,
                          instr_dim, use_instr, lang_model, use_memory, arch)
@@ -20,6 +20,7 @@ class IACModel(ACModel):
             nn.LogSoftmax(dim=1)
         )
         self.embedding = None
+        self.detach = detach
 
     @property
     def model_hyperparameters(self):
@@ -80,6 +81,9 @@ class IACModel(ACModel):
         x = self.critic(embedding)
         value = x.squeeze(1)
 
-        reason = self.reasoning(embedding)
+        if self.detach:
+            reason = self.reasoning(embedding.detach())
+        else:
+            reason = self.reasoning(embedding)
 
         return {'dist': dist, 'value': value, 'memory': memory, 'reason': reason}

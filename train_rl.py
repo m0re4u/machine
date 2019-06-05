@@ -60,9 +60,14 @@ def train_model():
                 m.cuda()
     elif opt.reasoning:
         algo = 'ppo'
-        model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                                opt.image_dim, opt.memory_dim, opt.instr_dim,
-                                not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+        if not opt.detach_hidden:
+            model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                                    opt.image_dim, opt.memory_dim, opt.instr_dim,
+                                    not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+        else:
+            model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                                    opt.image_dim, opt.memory_dim, opt.instr_dim,
+                                    not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch, detach=True)
         if torch.cuda.is_available():
             model.cuda()
         model.train()
@@ -182,6 +187,8 @@ def init_argparser():
     # Reasoning arguments
     parser.add_argument('--reasoning', default=False, action='store_true',
                         help='Turn on training with reasoning')
+    parser.add_argument('--detach_hidden', default=False, action='store_true',
+                        help='Detach hidden state from rest of the network')
 
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
