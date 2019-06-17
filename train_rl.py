@@ -187,7 +187,7 @@ def init_argparser():
     # Reasoning arguments
     parser.add_argument('--reasoning', default=False, action='store_true',
                         help='Turn on training with reasoning')
-    parser.add_argument('--detach_hidden', default=False, action='store_true',
+    parser.add_argument('--detach_hidden', default=True, action='store_true',
                         help='Detach hidden state from rest of the network')
 
     # Model parameters

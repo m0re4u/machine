@@ -28,6 +28,8 @@ def main(args):
     agent = machine.util.load_agent(
         env, args.model, env_name=args.env, vocab=args.vocab, partial=partial)
 
+    reason_labeler = machine.util.ReasonLabeler(1, 2)
+
     for name, param in agent.model.named_parameters():
         if 'reasoning' not in name:
             # Freeze layers we do not wish to train
@@ -48,7 +50,11 @@ def main(args):
     while True:
         time.sleep(args.pause)
 
-        target = machine.util.get_reason([obs], [info])
+        # Get reason
+        task_status = reason_labeler.annotate_status([obs], [info])
+        target = reason_labeler.compute_reasons(torch.stack([task_status]), [obs])
+
+        # Act with agent
         result = agent.act(obs)
 
         # Update diagnostic classifier
@@ -69,7 +75,7 @@ def main(args):
             if pred_idx.item() == target.item():
                 correct_frames += 1
 
-        # Perform action
+        # Update the environment
         obs, reward, done, info = env.step(result['action'])
         agent.memory *= (1 - done)
         if done:
