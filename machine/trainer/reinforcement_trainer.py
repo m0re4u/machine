@@ -212,6 +212,9 @@ class ReinforcementTrainer(object):
                                        (value_loss * disrupt_val))
                     elif self.reasoning:
                         a = sb.reasons.type(torch.long)
+                        val, idx = model_results['reason'].max(dim=1)
+                        acc = torch.sum(a == idx) / self.num_procs
+                        self.log_reason_correct.append(acc)
                         reason_loss = self.reason_criterion(model_results['reason'], a)
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef * value_loss) + \
@@ -325,6 +328,7 @@ class ReinforcementTrainer(object):
         self.log_num_frames = [0] * self.num_procs
         if self.reasoning:
             self.task_status = torch.as_tensor([[0] * self.num_subtasks] * self.num_procs, dtype=torch.float)
+            self.log_reason_correct = [0] * self.num_procs
 
     def update_memory(self, i, action, value, obs, reward, done):
         """
@@ -464,9 +468,9 @@ class ReinforcementTrainer(object):
         self.log_return = self.log_return[-self.num_procs:]
         self.log_reshaped_return = self.log_reshaped_return[-self.num_procs:]
         self.log_num_frames = self.log_num_frames[-self.num_procs:]
-        # if self.reasoning:
-        #     log['correct_reasons'] = self.log_reason_results[-keep:]
-        #     self.log_reason_results = self.log_reason_results[-self.num_procs:]
+        if self.reasoning:
+            log['correct_reasons'] = self.log_reason_correct[-keep:]
+            self.log_reason_correct = self.log_reason_correct[-self.num_procs:]
         return log
 
     def _get_batches_starting_indexes(self):
