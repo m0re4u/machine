@@ -214,7 +214,7 @@ class ReinforcementTrainer(object):
                         a = sb.reasons.type(torch.long)
                         val, idx = model_results['reason'].max(dim=1)
                         acc = torch.sum(a == idx) / self.num_procs
-                        self.log_reason_correct.append(acc)
+                        self.log_reason_correct.append(acc.item())
                         reason_loss = self.reason_criterion(model_results['reason'], a)
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef * value_loss) + \
