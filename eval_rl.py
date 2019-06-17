@@ -65,7 +65,7 @@ def main(args):
             optimizer.zero_grad()
         if args.gather:
             episode_data.append(
-                [agent.model.embedding.view(-1).numpy(), target.item()])
+                [agent.model.embedding.view(-1).cpu().numpy(), target.item()])
 
         # Check statistics
         num_frames[target] += 1
