@@ -184,7 +184,7 @@ class RLCheckpoint(BaseCheckpoint):
         else:
             logger.error("Error while assuming model")
 
-        model.load_state_dict(state['model'])
+        model.load_state_dict(state['model'], strict=False)
         print(model)
         model.eval()
         return model

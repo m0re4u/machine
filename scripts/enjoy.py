@@ -39,7 +39,7 @@ if __name__ == "__main__":
                         help="name of the trained model (REQUIRED)")
     parser.add_argument("--vocab", default=None, required=True,
                         help="vocabulary file (REQUIRED)")
-    parser.add_argument("--seed", type=int, default=None,
+    parser.add_argument("--seed", type=int, default=1,
                         help="random seed (default: 0 if model agent, 1 if demo agent)")
     parser.add_argument("--shift", type=int, default=0,
                         help="number of times the environment is reset at the beginning (default: 0)")
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         env.reset()
 
     global obs
-    obs = env.reset()
+    obs, info = env.reset()
     print("Mission: {}".format(obs["mission"]))
 
     # Define agent and load trained model
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 print("step: {}, mission: {}".format(step, obs['mission']))
             if done:
                 print("Reward:", reward)
-                obs = env.reset()
+                obs, info = env.reset()
                 agent.on_reset()
                 step = 0
             else:
