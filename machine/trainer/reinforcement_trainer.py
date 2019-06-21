@@ -211,7 +211,7 @@ class ReinforcementTrainer(object):
                             entropy + (self.value_loss_coef *
                                        (value_loss * disrupt_val))
                     elif self.reasoning:
-                        a = sb.reasons.type(torch.long)
+                        a = sb.reasons.type(torch.long).to(device)
                         zero_mask = (a >= 0).type(torch.long)
                         val, idx = model_results['reason'].max(dim=1)
                         if torch.sum(zero_mask) > 0:
