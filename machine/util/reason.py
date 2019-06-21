@@ -13,7 +13,7 @@ class ReasonLabeler():
     def __init__(self, num_procs, num_subtasks):
         self.num_procs = num_procs
         self.num_subtasks = num_subtasks
-        self.last_status = torch.zeros(self.num_procs, self.num_subtasks)
+        self.last_status = torch.zeros(self.num_procs, self.num_subtasks, device=device)
         self.prev_labels = torch.zeros(self.num_procs)
 
     def annotate_status(self, obs, obs_info):
@@ -41,8 +41,8 @@ class ReasonLabeler():
         """
         n_frames = statuses.size()[0]
         num_procs = statuses.size()[1]
-        x = torch.zeros(n_frames, num_procs, dtype=torch.int)
-        self.latest_label = torch.ones(num_procs).fill_(-1)
+        x = torch.zeros(n_frames, num_procs, dtype=torch.int).to(device)
+        self.latest_label = torch.ones(num_procs).fill_(-1).to(device)
         for i in reversed(range(n_frames)):
             prev_status = statuses[i-1, :, :] if i > 0 else self.last_status
             for p, proc in enumerate(prev_status):
