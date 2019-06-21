@@ -16,8 +16,8 @@ class IACModel(ACModel):
                          instr_dim, use_instr, lang_model, use_memory, arch)
         self.reasoning = nn.Sequential(
             nn.Linear(self.embedding_size, 18),
-            nn.ReLU(),
-            nn.LogSoftmax(dim=1)
+            # nn.ReLU(),
+            # nn.Linear(32, 18)
         )
         self.embedding = None
         self.detach = detach

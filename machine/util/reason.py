@@ -42,14 +42,14 @@ class ReasonLabeler():
         n_frames = statuses.size()[0]
         num_procs = statuses.size()[1]
         x = torch.zeros(n_frames, num_procs, dtype=torch.int)
+        self.latest_label = torch.ones(num_procs).fill_(-1)
         for i in reversed(range(n_frames)):
             prev_status = statuses[i-1, :, :] if i > 0 else self.last_status
             for p, proc in enumerate(prev_status):
                 mission = obs[p]['mission']
-
                 # Create label based on mission type
                 if 'and' in mission:
-                    x[i, p] = self.get_and_label(statuses[i, p, :], prev_status[p, :], mission)
+                    x[i, p] = self.get_and_label(statuses[i, p, :], prev_status[p, :], p, mission)
                 elif 'or' in mission:
                     pass
                 elif 'then' in mission:
@@ -62,18 +62,17 @@ class ReasonLabeler():
         self.last_status = statuses[-1, :, :].clone()
         return x
 
-    def get_and_label(self, status, prev_status, mission):
+    def get_and_label(self, status, prev_status, proc_idx, mission):
         """
 
         """
         assert status.size() == prev_status.size()
         res = (prev_status != status).nonzero()
-        label = 0
         if res.nelement() == 0:
             pass
         else:
-            label = res[0].item()
-        return label
+            self.latest_label[proc_idx] = res[0].item()
+        return self.latest_label[proc_idx]
 
     def get_then_label(self, status, mission):
         """

@@ -60,14 +60,21 @@ def train_model():
                 m.cuda()
     elif opt.reasoning:
         algo = 'ppo'
-        if not opt.detach_hidden:
-            model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                                    opt.image_dim, opt.memory_dim, opt.instr_dim,
-                                    not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+        if opt.resume:
+            model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint)
+            if opt.detach_hidden:
+                model.detach = True
+            else:
+                model.detach = False
         else:
-            model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                                    opt.image_dim, opt.memory_dim, opt.instr_dim,
-                                    not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch, detach=True)
+            if not opt.detach_hidden:
+                model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                                        opt.image_dim, opt.memory_dim, opt.instr_dim,
+                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+            else:
+                model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                                        opt.image_dim, opt.memory_dim, opt.instr_dim,
+                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch, detach=True)
         if torch.cuda.is_available():
             model.cuda()
         model.train()

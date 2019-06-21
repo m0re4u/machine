@@ -58,7 +58,7 @@ class ReinforcementTrainer(object):
         # Argument for reasoning
         self.reasoning = reasoning
         if self.reasoning:
-            self.reason_criterion = torch.nn.NLLLoss()
+            self.reason_criterion = torch.nn.CrossEntropyLoss()
             self.num_subtasks = 2
             self.reason_labeler = ReasonLabeler(self.num_procs, self.num_subtasks)
 
@@ -140,7 +140,7 @@ class ReinforcementTrainer(object):
 
         if self.reasoning:
             # Fill in the correct reasons over the observed frames
-            self.reason_labels = self.reason_labeler.compute_reasons(self.status, self.obs)
+            self.reasons = self.reason_labeler.compute_reasons(self.status, self.obs)
 
         # Flatten the data correctly, making sure that each episode's data is
         # a continuous chunk.
@@ -212,10 +212,20 @@ class ReinforcementTrainer(object):
                                        (value_loss * disrupt_val))
                     elif self.reasoning:
                         a = sb.reasons.type(torch.long)
+                        zero_mask = (a >= 0).type(torch.long)
                         val, idx = model_results['reason'].max(dim=1)
-                        acc = torch.sum(a == idx) / self.num_procs
-                        self.log_reason_correct.append(acc.item())
-                        reason_loss = self.reason_criterion(model_results['reason'], a)
+                        if torch.sum(zero_mask) > 0:
+                            correct = torch.sum(a == idx).item()
+                            summ = torch.sum(zero_mask).item()
+                            acc = correct / summ
+                        else:
+                            acc = 0
+                        self.log_reason_correct.append(acc)
+                        rr = model_results['reason'].size()
+                        zz = zero_mask.repeat(rr[-1], 1).transpose(0,1)
+                        a1 = model_results['reason'].type(torch.float) * zz.type(torch.float)
+                        a2 = a * zero_mask
+                        reason_loss = self.reason_criterion(a1, a2)
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef * value_loss) + \
                             reason_loss
