@@ -58,6 +58,7 @@ class ReinforcementTrainer(object):
         # Argument for reasoning
         self.reasoning = reasoning
         if self.reasoning:
+            self.reason_coef = opt.reason_coef
             self.reason_criterion = torch.nn.CrossEntropyLoss()
             self.num_subtasks = 2
             self.reason_labeler = ReasonLabeler(self.num_procs, self.num_subtasks)
@@ -228,7 +229,7 @@ class ReinforcementTrainer(object):
                         reason_loss = self.reason_criterion(a1, a2)
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef * value_loss) + \
-                            reason_loss
+                            self.reason_coef * reason_loss
                     else:
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef * value_loss)

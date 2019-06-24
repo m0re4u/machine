@@ -196,6 +196,9 @@ def init_argparser():
                         help='Turn on training with reasoning')
     parser.add_argument('--detach_hidden', default=False, action='store_true',
                         help='Detach hidden state from rest of the network')
+    parser.add_argument('--reason_coef', type=float, default=0.1,
+                        help='Multiply the reasoning loss with this value')
+
 
     # Model parameters
     parser.add_argument("--image-dim", type=int, default=128,
