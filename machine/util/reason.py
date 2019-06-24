@@ -51,7 +51,7 @@ class ReasonLabeler():
                 if 'and' in mission:
                     x[i, p] = self.get_and_label(statuses[i, p, :], prev_status[p, :], p, mission)
                 elif 'or' in mission:
-                    pass
+                    x[i, p] = self.get_or_label(statuses[i, p, :], prev_status[p, :], p, mission)
                 elif 'then' in mission:
                     x[i, p] = self.get_then_label(statuses[i, p, :], mission)
                 elif 'after' in mission:
@@ -77,13 +77,33 @@ class ReasonLabeler():
         label = mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
         return label
 
+    def get_or_label(self, status, prev_status, proc_idx, mission):
+        """
+        inclusive or
+        """
+        assert status.size() == prev_status.size()
+        res = (prev_status != status).nonzero()
+        if res.nelement() == 0:
+            pass
+        else:
+            self.latest_label[proc_idx] = res[0].item()
+        task_idx = self.latest_label[proc_idx].item()
+        split_instr = mission.split('or')
+        label = mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
+        return label
+
     def get_then_label(self, status, mission):
         """
         Get reason label from a THEN (before) instruction. Since we have a strict
         temporal ordering we don't need any information besides the current
         subtask status and the instruction itself.
         """
-        res = (status == 0).nonzero()[0].item()
+
+        res = (status == 0).nonzero()
+        if len(res):
+            res = res[0].item()
+        else:
+            res = -1
         split_instr = mission.split('then')
         label = mapping[split_instr[res].replace("go to the", "").strip()]
         return label
@@ -94,7 +114,11 @@ class ReasonLabeler():
         temporal ordering we don't need any information besides the current subtask
         status and the instruction itself.
         """
-        res = (status == 0).nonzero()[-1].item()
+        res = (status == 0).nonzero()
+        if len(res):
+            res = res[-1].item()
+        else:
+            res = -1
         split_instr = mission.split('after')
         label = mapping[split_instr[res].replace("go to the", "").strip()]
         return label
