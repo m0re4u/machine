@@ -4,15 +4,26 @@
 Evaluate a (partially) trained model or bot. Can also gather data
 """
 
-import argparse
 import time
+import argparse
 
 import gym
-import numpy as np
 import torch
+import numpy as np
 
 import machine.util
 
+NUM_OBJ_CLASSES = 18
+
+
+def reset_episode_data():
+    episode_data = {
+        'obs': [],
+        'status': [],
+        'embeddings': [],
+        'prediction': []
+    }
+    return episode_data
 
 def main(args):
     env = gym.make(args.env)
@@ -28,8 +39,10 @@ def main(args):
     agent = machine.util.load_agent(
         env, args.model, env_name=args.env, vocab=args.vocab, partial=partial)
 
+    # One process, two subtasks per process
     reason_labeler = machine.util.ReasonLabeler(1, 2)
 
+    # Freeze layers and optionally load diagnostic model
     for name, param in agent.model.named_parameters():
         if 'reasoning' not in name:
             # Freeze layers we do not wish to train
@@ -39,54 +52,52 @@ def main(args):
             state = torch.load(args.diag_model)
             param.data.copy_(state[name.partition('.')[2]])
 
-    loss_function = torch.nn.NLLLoss()
-    optimizer = torch.optim.Adam(agent.model.parameters())
-
     obs, info = env.reset()
     num_episodes = 0
-    num_frames = np.zeros(18)
+    num_frames = np.zeros(NUM_OBJ_CLASSES)
     correct_frames = 0
-    episode_data = []
+    episode_data = reset_episode_data()
+
     while True:
         time.sleep(args.pause)
-
-        # Get reason
-        task_status = reason_labeler.annotate_status([obs], [info])
-        target = reason_labeler.compute_reasons(torch.stack([task_status]), [obs])
 
         # Act with agent
         result = agent.act(obs)
 
-        # Update diagnostic classifier
-        if args.train:
-            loss = loss_function(result['reason'], target)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-        if args.gather:
-            episode_data.append(
-                [agent.model.embedding.view(-1).cpu().numpy(), target.item()])
-
-        # Check statistics
-        num_frames[target] += 1
-        if not args.gather:
-            _, pred_idx = result['reason'].max(1)
-            print(f"Reason: {pred_idx.item()} - True: {target.item()}")
-            if pred_idx.item() == target.item():
-                correct_frames += 1
-
         # Update the environment
         obs, reward, done, info = env.step(result['action'])
         agent.memory *= (1 - done)
+
+        # Save data for a frame in episode
+        episode_data['obs'].append(obs)
+        episode_data['status'].append(reason_labeler.annotate_status([obs], [info]))
+
+        if args.gather:
+            episode_data['embeddings'].append(agent.model.embedding.view(-1).cpu().numpy())
+        _, pred_idx = result['reason'].max(1)
+        episode_data['prediction'].append(pred_idx.item())
+
         if done:
-            # Upon episode completion
+            # Upon episode completion, get target reason
+            target = reason_labeler.compute_reasons(
+                torch.stack(episode_data['status']), episode_data['obs'])
+
+            correct = torch.sum(torch.as_tensor(episode_data['prediction']).type(torch.int32) == target.flatten())
+            correct_frames += correct.item()
+            for i, pred in enumerate(episode_data['prediction']):
+                num_frames[target[i].item()] += 1
+                print(f"Reason: {pred:2} - True: {target[i].item():2}")
+
+            # Save data if we're gathering experience
             if args.gather:
-                np.save(
-                    f"data/reason_dataset/data_{num_episodes:03}", np.array(episode_data))
+                gather_data = np.array([episode_data['embeddings'], target.cpu().numpy().flatten()])
+                np.save(f"data/reason_dataset/data_{num_episodes:03}", gather_data.T)
+
             num_episodes += 1
-            print(
-                f"Mission {num_episodes:3}: {obs['mission']:50} - reward: {reward}")
+            print(f"Completed mission {num_episodes:3}: {obs['mission']:50} - reward: {reward}")
             obs, info = env.reset()
+            episode_data = reset_episode_data()
+
             if num_episodes > args.episodes:
                 break
             else:
@@ -95,10 +106,10 @@ def main(args):
     # Print results
     print(f"\n\
             Accuracy:            {correct_frames / np.sum(num_frames)}\n\
-            Frames observed:     {np.sum(num_frames)}\n\
-            Frames for reason 0: {num_frames[0]}\n\
-            Frames for reason 1: {num_frames[1]}")
-    return
+            Frames observed:     {np.sum(num_frames)}")
+    for i in range(NUM_OBJ_CLASSES):
+        print(f"\
+            Frames for reason {i:2}: {num_frames[i]}")
 
 
 if __name__ == "__main__":
@@ -117,8 +128,6 @@ if __name__ == "__main__":
                         help="random seed")
     parser.add_argument("--pause", type=float, default=0,
                         help="the pause between two consequent actions of an agent")
-    parser.add_argument("--train", default=False, action='store_true',
-                        help="Whether to online train")
     parser.add_argument("--gather", default=False, action='store_true',
                         help="Whether to collect data for later training")
     parser.add_argument("--reasoning", type=str, default=None, choices=['diagnostic', 'model'],

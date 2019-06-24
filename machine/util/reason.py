@@ -72,7 +72,10 @@ class ReasonLabeler():
             pass
         else:
             self.latest_label[proc_idx] = res[0].item()
-        return self.latest_label[proc_idx]
+        task_idx = self.latest_label[proc_idx].item()
+        split_instr = mission.split('and')
+        label = mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
+        return label
 
     def get_then_label(self, status, mission):
         """
