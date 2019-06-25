@@ -198,6 +198,8 @@ def init_argparser():
                         help='Detach hidden state from rest of the network')
     parser.add_argument('--reason_coef', type=float, default=0.1,
                         help='Multiply the reasoning loss with this value')
+    parser.add_argument('--delay_reason', type=int, default=0,
+                        help='Delay reasoning training by this many cycles')
 
 
     # Model parameters
