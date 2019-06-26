@@ -19,6 +19,9 @@ python3 train_rl.py \
     --env-name BabyAI-CustomGoToObjAnd-v0 \
     --print_every 1 \
     --slurm_id $SLURM_JOB_ID \
+    --tb \
     --seed 42 \
     --reasoning \
-    --tb
+    --reason_coef 2 \
+    --delay_reason 3000
+

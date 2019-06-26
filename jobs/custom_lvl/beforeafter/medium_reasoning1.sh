@@ -21,4 +21,7 @@ python3 train_rl.py \
     --slurm_id $SLURM_JOB_ID \
     --tb \
     --seed 1 \
-    --reasoning
+    --reasoning \
+    --reason_coef 2 \
+    --delay_reason 3000
+
