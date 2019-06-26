@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -p gpu_shared
-#SBATCH -t 12:00:00
+#SBATCH -t 6:00:00
 #SBATCH --mem=12GB
 
 #SBATCH --mail-type=END
@@ -16,8 +16,8 @@ pushd ${HOME}/machine/
 
 # Run training
 python3 train_rl.py \
-    --env-name BabyAI-CustomGoToObjSmall-v0 \
+    --env-name BabyAI-CustomGoToObjMedium-v0 \
     --print_every 1 \
     --slurm_id $SLURM_JOB_ID \
-    --seed 100 \
-    --tb
+    --tb \
+    --seed 100

@@ -19,5 +19,5 @@ python3 train_rl.py \
     --env-name BabyAI-CustomGoToObjSmall-v0 \
     --print_every 1 \
     --slurm_id $SLURM_JOB_ID \
-    --seed 1 \
-    --tb
+    --tb \
+    --seed 100
