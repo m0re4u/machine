@@ -16,12 +16,12 @@ pushd ${HOME}/machine/
 
 # Run training
 python3 train_rl.py \
-    --env-name BabyAI-CustomGoToObjSmall-v0 \
+    --env-name BabyAI-CustomGoToObjAndOr-v0 \
     --print_every 1 \
     --slurm_id $SLURM_JOB_ID \
     --tb \
     --seed 100 \
     --reasoning \
     --reason_coef 2 \
-    --delay_reason 2000
+    --delay_reason 3000
 
