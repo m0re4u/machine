@@ -15,6 +15,7 @@ import machine.util
 
 NUM_OBJ_CLASSES = 18
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def reset_episode_data():
     episode_data = {
@@ -82,7 +83,7 @@ def main(args):
             target = reason_labeler.compute_reasons(
                 torch.stack(episode_data['status']), episode_data['obs'])
 
-            correct = torch.sum(torch.as_tensor(episode_data['prediction']).type(torch.int32) == target.flatten())
+            correct = torch.sum(torch.as_tensor(episode_data['prediction']).to(device).type(torch.int32) == target.to(device).flatten())
             correct_frames += correct.item()
             for i, pred in enumerate(episode_data['prediction']):
                 num_frames[target[i].item()] += 1
