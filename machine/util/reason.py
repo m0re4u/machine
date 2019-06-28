@@ -14,7 +14,7 @@ class ReasonLabeler():
         self.num_procs = num_procs
         self.num_subtasks = num_subtasks
         self.last_status = torch.zeros(self.num_procs, self.num_subtasks, device=device)
-        self.prev_labels = torch.zeros(self.num_procs)
+        self.prev_labels = torch.zeros(self.num_procs, device=device)
 
     def annotate_status(self, obs, obs_info):
         """
