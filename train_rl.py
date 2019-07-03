@@ -61,20 +61,20 @@ def train_model():
     elif opt.reasoning:
         algo = 'ppo'
         if opt.resume:
-            model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint)
-            if opt.detach_hidden:
-                model.detach = True
+            if opt.diag_targets == 18:
+                model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint)
             else:
-                model.detach = False
+                model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint, diag_targets=opt.diag_targets)
+            model.detach = opt.detach_hidden
         else:
             if not opt.detach_hidden:
                 model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
                                         opt.image_dim, opt.memory_dim, opt.instr_dim,
-                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch, opt.diag_targets)
             else:
                 model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
                                         opt.image_dim, opt.memory_dim, opt.instr_dim,
-                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch, detach=True)
+                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch, opt.diag_targets, detach=True)
         if torch.cuda.is_available():
             model.cuda()
         model.train()
@@ -194,6 +194,8 @@ def init_argparser():
     # Reasoning arguments
     parser.add_argument('--reasoning', default=False, action='store_true',
                         help='Turn on training with reasoning')
+    parser.add_argument('--diag_targets', default=18, type=int,
+                        help='Number of diagnostic classifier targets')
     parser.add_argument('--detach_hidden', default=False, action='store_true',
                         help='Detach hidden state from rest of the network')
     parser.add_argument('--reason_coef', type=float, default=0.1,

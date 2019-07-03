@@ -31,6 +31,7 @@ words_to_wordtype = {
     'purple': SegmentType.NOUN,
     'yellow': SegmentType.NOUN,
     'grey':   SegmentType.NOUN,
+    'cyan':   SegmentType.NOUN,
     'next': SegmentType.PROP,
     'to':   SegmentType.PROP,
     'of':   SegmentType.PROP,
@@ -53,7 +54,8 @@ colors = set([
     'blue',
     'purple',
     'yellow',
-    'grey'
+    'grey',
+    'cyan'
 ])
 
 

@@ -10,12 +10,13 @@ class IACModel(ACModel):
     def __init__(self, obs_space, action_space,
                  image_dim=128, memory_dim=128, instr_dim=128,
                  use_instr=False, lang_model="gru", use_memory=False,
-                 arch="cnn1", detach=False):
+                 arch="cnn1", diag_targets=18, detach=False):
 
         super().__init__(obs_space, action_space, image_dim, memory_dim,
                          instr_dim, use_instr, lang_model, use_memory, arch)
+        self.diag_targets = diag_targets
         self.reasoning = nn.Sequential(
-            nn.Linear(self.embedding_size, 18),
+            nn.Linear(self.embedding_size, self.diag_targets),
             # nn.ReLU(),
             # nn.Linear(32, 18)
         )
