@@ -49,9 +49,9 @@ class ReasonLabeler():
                 mission = obs[p]['mission']
                 # Create label based on mission type
                 if 'and' in mission:
-                    x[i, p] = self.get_and_label(statuses[i, p, :], prev_status[p, :], p, mission)
+                    x[i, p] = self.get_and_label(statuses[i, p, :], prev_status[p, :].to(device), p, mission)
                 elif 'or' in mission:
-                    x[i, p] = self.get_or_label(statuses[i, p, :], prev_status[p, :], p, mission)
+                    x[i, p] = self.get_or_label(statuses[i, p, :], prev_status[p, :].to(device), p, mission)
                 elif 'then' in mission:
                     x[i, p] = self.get_then_label(statuses[i, p, :], mission)
                 elif 'after' in mission:
@@ -67,7 +67,7 @@ class ReasonLabeler():
 
         """
         assert status.size() == prev_status.size()
-        res = (prev_status != status).nonzero()
+        res = (prev_status != status.to(device)).nonzero()
         if res.nelement() == 0:
             pass
         else:
@@ -82,7 +82,7 @@ class ReasonLabeler():
         inclusive or
         """
         assert status.size() == prev_status.size()
-        res = (prev_status != status).nonzero()
+        res = (prev_status != status.to(device)).nonzero()
         if res.nelement() == 0:
             pass
         else:
