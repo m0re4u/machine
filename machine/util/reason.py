@@ -3,7 +3,7 @@ from itertools import product
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-OBJ_TYPES = ['box', 'ball', 'key']
+OBJ_TYPES = ['box', 'ball', 'key','triangle']
 COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey', 'cyan']
 obj_list = list(product(COLORS, OBJ_TYPES))
 mapping = {" ".join(k): v for v, k in enumerate(obj_list)}

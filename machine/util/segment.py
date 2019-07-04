@@ -25,6 +25,7 @@ words_to_wordtype = {
     'key':  SegmentType.NOUN,
     'box':  SegmentType.NOUN,
     'door':  SegmentType.NOUN,
+    'triangle':  SegmentType.NOUN,
     'red':  SegmentType.NOUN,
     'green':  SegmentType.NOUN,
     'blue':   SegmentType.NOUN,
