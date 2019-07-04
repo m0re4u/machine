@@ -3,18 +3,29 @@ from itertools import product
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-OBJ_TYPES = ['box', 'ball', 'key','triangle']
-COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey', 'cyan']
-obj_list = list(product(COLORS, OBJ_TYPES))
-mapping = {" ".join(k): v for v, k in enumerate(obj_list)}
-
 
 class ReasonLabeler():
-    def __init__(self, num_procs, num_subtasks):
+    def __init__(self, num_procs, num_subtasks, tt=None):
         self.num_procs = num_procs
         self.num_subtasks = num_subtasks
         self.last_status = torch.zeros(self.num_procs, self.num_subtasks, device=device)
         self.prev_labels = torch.zeros(self.num_procs, device=device)
+        self.transfer_type = tt
+        if self.transfer_type == 0:
+            OBJ_TYPES = ['box', 'ball', 'key']
+            COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey', 'cyan']
+        elif transfer_type == 1:
+            OBJ_TYPES = ['box', 'ball', 'key','triangle']
+            COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey']
+        elif transfer_type == 2:
+            OBJ_TYPES = ['box', 'ball', 'key','triangle']
+            COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey', 'cyan']
+        else:
+            OBJ_TYPES = ['box', 'ball', 'key']
+            COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey']
+
+        obj_list = list(product(COLORS, OBJ_TYPES))
+        self.mapping = {" ".join(k): v for v, k in enumerate(obj_list)}
 
     def annotate_status(self, obs, obs_info):
         """
@@ -74,7 +85,7 @@ class ReasonLabeler():
             self.latest_label[proc_idx] = res[0].item()
         task_idx = self.latest_label[proc_idx].item()
         split_instr = mission.split('and')
-        label = mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
+        label = self.mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
         return label
 
     def get_or_label(self, status, prev_status, proc_idx, mission):
@@ -89,7 +100,7 @@ class ReasonLabeler():
             self.latest_label[proc_idx] = res[0].item()
         task_idx = self.latest_label[proc_idx].item()
         split_instr = mission.split('or')
-        label = mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
+        label = self.mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
         return label
 
     def get_then_label(self, status, mission):
@@ -105,7 +116,7 @@ class ReasonLabeler():
         else:
             res = -1
         split_instr = mission.split('then')
-        label = mapping[split_instr[res].replace("go to the", "").strip()]
+        label = self.mapping[split_instr[res].replace("go to the", "").strip()]
         return label
 
     def get_after_label(self, status, mission):
@@ -120,5 +131,5 @@ class ReasonLabeler():
         else:
             res = -1
         split_instr = mission.split('after')
-        label = mapping[split_instr[res].replace("go to the", "").strip()]
+        label = self.mapping[split_instr[res].replace("go to the", "").strip()]
         return label
