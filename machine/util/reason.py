@@ -14,10 +14,10 @@ class ReasonLabeler():
         if self.transfer_type == 0:
             OBJ_TYPES = ['box', 'ball', 'key']
             COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey', 'cyan']
-        elif transfer_type == 1:
+        elif self.transfer_type == 1:
             OBJ_TYPES = ['box', 'ball', 'key','triangle']
             COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey']
-        elif transfer_type == 2:
+        elif self.transfer_type == 2:
             OBJ_TYPES = ['box', 'ball', 'key','triangle']
             COLORS = ['red', 'green', 'blue', 'purple', 'yellow', 'grey', 'cyan']
         else:
