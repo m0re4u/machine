@@ -204,8 +204,10 @@ class RLCheckpoint(BaseCheckpoint):
             logger.warn("Dropped diagnostic classifier weights")
             del state['model']['reasoning.0.weight']
             del state['model']['reasoning.0.bias']
+            model = machine.models.IACModel(*state['model_params'], diag_targets=diag_targets)
+        else:
+            model = machine.models.IACModel(*state['model_params'])
 
-        model = machine.models.IACModel(*state['model_params'], diag_targets=diag_targets)
         missing, unexp = model.load_state_dict(state['model'], strict=False)
         if missing != [] or unexp != []:
             logger.warn(f"Missing keys: {missing} - Unexpected keys: {unexp}")

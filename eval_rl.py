@@ -13,8 +13,6 @@ import numpy as np
 
 import machine.util
 
-NUM_OBJ_CLASSES = 18
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def reset_episode_data():
@@ -41,7 +39,12 @@ def main(args):
         env, args.model, env_name=args.env, vocab=args.vocab, partial=partial)
 
     # One process, two subtasks per process
-    reason_labeler = machine.util.ReasonLabeler(1, 2)
+    if "Transfer" in args.env:
+        transfer_type = int(args.env.split("-")[1][-1])
+        reason_labeler = machine.util.ReasonLabeler(1,2, tt=transfer_type)
+    else:
+        reason_labeler = machine.util.ReasonLabeler(1,2)
+
 
     # Freeze layers and optionally load diagnostic model
     for name, param in agent.model.named_parameters():
@@ -50,12 +53,12 @@ def main(args):
             param.requires_grad = False
         if args.reasoning == 'diagnostic' and 'reasoning' in name and args.diag_model is not None:
             # Load trained diagnostic classifier
-            state = torch.load(args.diag_model)
+            state = torch.load(args.diag_model, map_location='cpu')
             param.data.copy_(state[name.partition('.')[2]])
 
     obs, info = env.reset()
     num_episodes = 0
-    num_frames = np.zeros(NUM_OBJ_CLASSES)
+    num_frames = np.zeros(args.diag_targets)
     correct_frames = 0
     episode_data = reset_episode_data()
 
@@ -108,7 +111,7 @@ def main(args):
     print(f"\n\
             Accuracy:            {correct_frames / np.sum(num_frames)}\n\
             Frames observed:     {np.sum(num_frames)}")
-    for i in range(NUM_OBJ_CLASSES):
+    for i in range(args.diag_targets):
         print(f"\
             Frames for reason {i:2}: {num_frames[i]}")
 
@@ -121,6 +124,8 @@ if __name__ == "__main__":
                         help="name of the trained ACModel (REQUIRED)")
     parser.add_argument("--diag_model", default=None,
                         help="name of the trained diagnostic classifier")
+    parser.add_argument("--diag_targets", default=18,type=int,
+                        help="Number of outputs for diagnostic classifier")
     parser.add_argument("--vocab", default=None, required=True,
                         help="vocabulary file (REQUIRED)")
     parser.add_argument("--episodes", type=int, default=10,
