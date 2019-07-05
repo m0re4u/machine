@@ -39,11 +39,15 @@ def main(args):
         env, args.model, env_name=args.env, vocab=args.vocab, partial=partial)
 
     # One process, two subtasks per process
+    if "GoTo" in args.env:
+        replace_instruction = "go to the"
+    elif "Pickup" in args.env:
+        replace_instruction = "pick up the"
     if "Transfer" in args.env:
         transfer_type = int(args.env.split("-")[1][-1])
-        reason_labeler = machine.util.ReasonLabeler(1,2, tt=transfer_type)
     else:
-        reason_labeler = machine.util.ReasonLabeler(1,2)
+        transfer_type = None
+    reason_labeler = machine.util.ReasonLabeler(1,2, tt=transfer_type, replace_instr=replace_instruction)
 
 
     # Freeze layers and optionally load diagnostic model

@@ -5,7 +5,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ReasonLabeler():
-    def __init__(self, num_procs, num_subtasks, tt=None):
+    def __init__(self, num_procs, num_subtasks, tt=None, replace_instr="go to the"):
         self.num_procs = num_procs
         self.num_subtasks = num_subtasks
         self.last_status = torch.zeros(self.num_procs, self.num_subtasks, device=device)
@@ -26,6 +26,8 @@ class ReasonLabeler():
 
         obj_list = list(product(COLORS, OBJ_TYPES))
         self.mapping = {" ".join(k): v for v, k in enumerate(obj_list)}
+
+        self.replace_instr = replace_instr
 
     def annotate_status(self, obs, obs_info):
         """
@@ -85,7 +87,7 @@ class ReasonLabeler():
             self.latest_label[proc_idx] = res[0].item()
         task_idx = self.latest_label[proc_idx].item()
         split_instr = mission.split('and')
-        label = self.mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
+        label = self.mapping[split_instr[int(task_idx)].replace(self.replace_instr, "").strip()]
         return label
 
     def get_or_label(self, status, prev_status, proc_idx, mission):
@@ -100,7 +102,7 @@ class ReasonLabeler():
             self.latest_label[proc_idx] = res[0].item()
         task_idx = self.latest_label[proc_idx].item()
         split_instr = mission.split('or')
-        label = self.mapping[split_instr[int(task_idx)].replace("go to the", "").strip()]
+        label = self.mapping[split_instr[int(task_idx)].replace(self.replace_instr, "").strip()]
         return label
 
     def get_then_label(self, status, mission):
@@ -116,7 +118,7 @@ class ReasonLabeler():
         else:
             res = -1
         split_instr = mission.split('then')
-        label = self.mapping[split_instr[res].replace("go to the", "").strip()]
+        label = self.mapping[split_instr[res].replace(self.replace_instr, "").strip()]
         return label
 
     def get_after_label(self, status, mission):
@@ -131,5 +133,5 @@ class ReasonLabeler():
         else:
             res = -1
         split_instr = mission.split('after')
-        label = self.mapping[split_instr[res].replace("go to the", "").strip()]
+        label = self.mapping[split_instr[res].replace(self.replace_instr, "").strip()]
         return label
