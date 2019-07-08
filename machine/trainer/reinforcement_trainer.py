@@ -62,11 +62,15 @@ class ReinforcementTrainer(object):
             self.reason_coef = opt.reason_coef
             self.reason_criterion = torch.nn.CrossEntropyLoss()
             self.num_subtasks = 2
+            if "GoTo" in opt.env_name:
+                replace_instruction = r"go to the"
+            elif "Pickup" in opt.env_name:
+                replace_instruction = r"pick up (the|a)"
             if "Transfer" in opt.env_name:
                 transfer_type = int(opt.env_name.split("-")[1][-1])
-                self.reason_labeler = ReasonLabeler(self.num_procs, self.num_subtasks, tt=transfer_type)
             else:
-                self.reason_labeler = ReasonLabeler(self.num_procs, self.num_subtasks)
+                transfer_type = None
+            self.reason_labeler = ReasonLabeler(self.num_procs, self.num_subtasks, tt=transfer_type, replace_instr=replace_instruction)
 
 
         # Initialize observations

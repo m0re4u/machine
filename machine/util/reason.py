@@ -1,3 +1,4 @@
+import re
 import torch
 from itertools import product
 
@@ -5,7 +6,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ReasonLabeler():
-    def __init__(self, num_procs, num_subtasks, tt=None, replace_instr="go to the"):
+    def __init__(self, num_procs, num_subtasks, tt=None, replace_instr=r"go to the"):
         self.num_procs = num_procs
         self.num_subtasks = num_subtasks
         self.last_status = torch.zeros(self.num_procs, self.num_subtasks, device=device)
@@ -87,7 +88,8 @@ class ReasonLabeler():
             self.latest_label[proc_idx] = res[0].item()
         task_idx = self.latest_label[proc_idx].item()
         split_instr = mission.split('and')
-        label = self.mapping[split_instr[int(task_idx)].replace(self.replace_instr, "").strip()]
+        map_ent = re.sub(self.replace_instr, "", split_instr[int(task_idx)]).strip()
+        label = self.mapping[map_ent]
         return label
 
     def get_or_label(self, status, prev_status, proc_idx, mission):
@@ -102,7 +104,8 @@ class ReasonLabeler():
             self.latest_label[proc_idx] = res[0].item()
         task_idx = self.latest_label[proc_idx].item()
         split_instr = mission.split('or')
-        label = self.mapping[split_instr[int(task_idx)].replace(self.replace_instr, "").strip()]
+        map_ent = re.sub(self.replace_instr, "", split_instr[int(task_idx)]).strip()
+        label = self.mapping[map_ent]
         return label
 
     def get_then_label(self, status, mission):
@@ -118,7 +121,8 @@ class ReasonLabeler():
         else:
             res = -1
         split_instr = mission.split('then')
-        label = self.mapping[split_instr[res].replace(self.replace_instr, "").strip()]
+        map_ent = re.sub(self.replace_instr, "", split_instr[res]).strip()
+        label = self.mapping[map_ent]
         return label
 
     def get_after_label(self, status, mission):
@@ -133,5 +137,6 @@ class ReasonLabeler():
         else:
             res = -1
         split_instr = mission.split('after')
-        label = self.mapping[split_instr[res].replace(self.replace_instr, "").strip()]
+        map_ent = re.sub(self.replace_instr, "", split_instr[res]).strip()
+        label = self.mapping[map_ent]
         return label
