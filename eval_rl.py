@@ -13,6 +13,9 @@ import numpy as np
 
 import machine.util
 
+from collections import defaultdict
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def reset_episode_data():
@@ -61,10 +64,13 @@ def main(args):
             param.data.copy_(state[name.partition('.')[2]])
 
     obs, info = env.reset()
+    episode_terminations = defaultdict(lambda: 0)
     num_episodes = 0
     num_frames = np.zeros(args.diag_targets)
     correct_frames = 0
     episode_data = reset_episode_data()
+    episode_lengths = []
+    ep_l = 0
 
     while True:
         time.sleep(args.pause)
@@ -74,6 +80,7 @@ def main(args):
 
         # Update the environment
         obs, reward, done, info = env.step(result['action'])
+        ep_l += 1
         agent.memory *= (1 - done)
 
         # Save data for a frame in episode
@@ -94,15 +101,28 @@ def main(args):
             correct_frames += correct.item()
             for i, pred in enumerate(episode_data['prediction']):
                 num_frames[target[i].item()] += 1
-                print(f"Reason: {pred:2} - True: {target[i].item():2}")
+                if not args.machine:
+                    print(f"Reason: {pred:2} - True: {target[i].item():2}")
 
             # Save data if we're gathering experience
             if args.gather:
                 gather_data = np.array([episode_data['embeddings'], target.cpu().numpy().flatten()])
                 np.save(f"data/reason_dataset/data_{num_episodes:03}", gather_data.T)
 
+            # Check termination of episode
+            if all([x == 'success' for x in info['status']]):
+                episode_terminations['success'] += 1
+            elif reward == 0:
+                if 'no_reward_reason' in info:
+                    episode_terminations['task_failure'] += 1
+                else:
+                    episode_terminations['timeout'] += 1
+
             num_episodes += 1
-            print(f"Completed mission {num_episodes:3}: {obs['mission']:50} - reward: {reward}")
+            episode_lengths.append(ep_l)
+            ep_l = 0
+            if not args.machine:
+                print(f"Completed mission {num_episodes:3}: {obs['mission']:50} - reward: {reward}")
             obs, info = env.reset()
             episode_data = reset_episode_data()
 
@@ -111,13 +131,26 @@ def main(args):
             else:
                 continue
 
+    for k, v in episode_terminations.items():
+        episode_terminations[k]= v / num_episodes
+
+    np.testing.assert_almost_equal(sum(episode_terminations.values()), 1, decimal=7, err_msg=f"-- {episode_terminations.values()}", verbose=True)
+
     # Print results
-    print(f"\n\
-            Accuracy:            {correct_frames / np.sum(num_frames)}\n\
-            Frames observed:     {np.sum(num_frames)}")
-    for i in range(args.diag_targets):
-        print(f"\
-            Frames for reason {i:2}: {num_frames[i]}")
+    if args.machine:
+        #frames,acc,eplen,succ,fail,time
+        print(f" {np.sum(num_frames)},{correct_frames / np.sum(num_frames)},{np.average(episode_lengths)},{episode_terminations['success']},{episode_terminations['task_failure']},{episode_terminations['timeout']}")
+    else:
+        print(f"\n\
+                Reason accuracy:        {correct_frames / np.sum(num_frames)}\n\
+                Average episode length: {np.average(episode_lengths)}\n\
+                Success rate:           {episode_terminations['success']}\n\
+                Failure rate:           {episode_terminations['task_failure']}\n\
+                Timeout rate:           {episode_terminations['timeout']}\n\
+                Frames observed:        {np.sum(num_frames)}")
+        for i in range(args.diag_targets):
+            print(f"\
+                Frames for reason {i:2}: {num_frames[i]:2.0f}")
 
 
 if __name__ == "__main__":
@@ -142,6 +175,9 @@ if __name__ == "__main__":
                         help="Whether to collect data for later training")
     parser.add_argument("--reasoning", type=str, default=None, choices=['diagnostic', 'model'],
                         help="Reasoning to ask the agent for")
+    parser.add_argument("--machine", default=False, action='store_true',
+                        help="print for machine use only")
+
     args = parser.parse_args()
 
     main(args)
