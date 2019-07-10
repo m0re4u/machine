@@ -111,8 +111,13 @@ def main(args):
 
             # Check termination of episode
             if all([x == 'success' for x in info['status']]):
+                # All objectives completed
+                episode_terminations['success'] += 1
+            elif any([x == 'success' for x in info['status']]) and 'or' in obs['mission'] and ep_l < env.max_steps:
+                # one objective completed in "or" mission
                 episode_terminations['success'] += 1
             elif reward == 0:
+                # not completed, record why not
                 if 'no_reward_reason' in info:
                     episode_terminations['task_failure'] += 1
                 else:
