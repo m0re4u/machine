@@ -39,7 +39,7 @@ def main(args):
     # Define agent and load in parts of the networks
     partial = (args.reasoning == 'diagnostic' or args.reasoning == 'model')
     agent = machine.util.load_agent(
-        env, args.model, env_name=args.env, vocab=args.vocab, partial=partial)
+        env, args.model, env_name=args.env, vocab=args.vocab, partial=partial, diag_targets=args.diag_targets)
 
     # One process, two subtasks per process
     if "GoTo" in args.env:
@@ -166,7 +166,7 @@ if __name__ == "__main__":
                         help="name of the trained ACModel (REQUIRED)")
     parser.add_argument("--diag_model", default=None,
                         help="name of the trained diagnostic classifier")
-    parser.add_argument("--diag_targets", default=18,type=int,
+    parser.add_argument("--diag_targets", default=None,type=int,
                         help="Number of outputs for diagnostic classifier")
     parser.add_argument("--vocab", default=None, required=True,
                         help="vocabulary file (REQUIRED)")

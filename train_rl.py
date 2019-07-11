@@ -64,7 +64,7 @@ def train_model():
             if opt.diag_targets == 18:
                 model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint)
             else:
-                model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint, diag_targets=opt.diag_targets)
+                model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint, diag_targets=opt.diag_targets, drop_diag=opt.drop_diag)
             model.detach = opt.detach_hidden
         else:
             if not opt.detach_hidden:
@@ -196,6 +196,8 @@ def init_argparser():
                         help='Turn on training with reasoning')
     parser.add_argument('--diag_targets', default=18, type=int,
                         help='Number of diagnostic classifier targets')
+    parser.add_argument('--drop_diag', default=False, action='store_true',
+                        help='Drop weights of diagnostic classifier if we resume training')
     parser.add_argument('--detach_hidden', default=False, action='store_true',
                         help='Detach hidden state from rest of the network')
     parser.add_argument('--reason_coef', type=float, default=0.1,

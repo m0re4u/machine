@@ -190,7 +190,7 @@ class RLCheckpoint(BaseCheckpoint):
         return model
 
     @classmethod
-    def load_partial_model(cls, path, diag_targets=None):
+    def load_partial_model(cls, path, diag_targets=None, drop_diag=False):
         """
         Load a partial model, only load in the layers that exists in the saved
         model and in IACModel.
@@ -199,11 +199,11 @@ class RLCheckpoint(BaseCheckpoint):
         logger.warn(f"Loading partial RLCheckpoint from {path}")
         state = torch.load(path, map_location=torch.device('cpu'))
         if diag_targets is not None:
-            # If given diag targets, assume we're not loading the diagnostic
-            # classifier and drop diagnostic weights
-            logger.warn("Dropped diagnostic classifier weights")
-            del state['model']['reasoning.0.weight']
-            del state['model']['reasoning.0.bias']
+            if drop_diag:
+                # Drop diagnostic weights
+                logger.warn("Dropped diagnostic classifier weights")
+                del state['model']['reasoning.0.weight']
+                del state['model']['reasoning.0.bias']
             model = machine.models.IACModel(*state['model_params'], diag_targets=diag_targets)
         else:
             model = machine.models.IACModel(*state['model_params'])
