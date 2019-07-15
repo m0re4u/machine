@@ -4,6 +4,7 @@
 Evaluate a (partially) trained model or bot. Can also gather data
 """
 
+import os
 import time
 import argparse
 
@@ -36,10 +37,16 @@ def main(args):
     np.random.seed(args.seed)
     env.seed(args.seed)
 
-    # Define agent and load in parts of the networks
+    # Define agent
     partial = (args.reasoning == 'diagnostic' or args.reasoning == 'model')
     agent = machine.util.load_agent(
-        env, args.model, env_name=args.env, vocab=args.vocab, partial=partial, diag_targets=args.diag_targets)
+        env,
+        args.model,
+        env_name=args.env,
+        vocab=args.vocab,
+        partial=partial,
+        diag_targets=args.diag_targets,
+        drop_diag=args.drop_diag)
 
     # One process, two subtasks per process
     if "GoTo" in args.env:
@@ -66,7 +73,8 @@ def main(args):
     obs, info = env.reset()
     episode_terminations = defaultdict(lambda: 0)
     num_episodes = 0
-    num_frames = np.zeros(args.diag_targets)
+    N_TARGETS = 18 if args.diag_targets is None else args.diag_targets
+    num_frames = np.zeros(N_TARGETS)
     correct_frames = 0
     episode_data = reset_episode_data()
     episode_lengths = []
@@ -107,7 +115,7 @@ def main(args):
             # Save data if we're gathering experience
             if args.gather:
                 gather_data = np.array([episode_data['embeddings'], target.cpu().numpy().flatten()])
-                np.save(f"data/reason_dataset/data_{num_episodes:03}", gather_data.T)
+                np.save(f"data/{args.data_dir}/data_{num_episodes:03}", gather_data.T)
 
             # Check termination of episode
             if all([x == 'success' for x in info['status']]):
@@ -153,7 +161,7 @@ def main(args):
                 Failure rate:           {episode_terminations['task_failure']}\n\
                 Timeout rate:           {episode_terminations['timeout']}\n\
                 Frames observed:        {np.sum(num_frames)}")
-        for i in range(args.diag_targets):
+        for i in range(N_TARGETS):
             print(f"\
                 Frames for reason {i:2}: {num_frames[i]:2.0f}")
 
@@ -168,6 +176,8 @@ if __name__ == "__main__":
                         help="name of the trained diagnostic classifier")
     parser.add_argument("--diag_targets", default=None,type=int,
                         help="Number of outputs for diagnostic classifier")
+    parser.add_argument("--drop_diag", default=False, action='store_true',
+                        help="ignore loading of weights for diagnostic classifier")
     parser.add_argument("--vocab", default=None, required=True,
                         help="vocabulary file (REQUIRED)")
     parser.add_argument("--episodes", type=int, default=10,
@@ -178,11 +188,19 @@ if __name__ == "__main__":
                         help="the pause between two consequent actions of an agent")
     parser.add_argument("--gather", default=False, action='store_true',
                         help="Whether to collect data for later training")
+    parser.add_argument("--data_dir", default='reason_dataset',
+                        help="directory name of collected data")
     parser.add_argument("--reasoning", type=str, default=None, choices=['diagnostic', 'model'],
                         help="Reasoning to ask the agent for")
     parser.add_argument("--machine", default=False, action='store_true',
                         help="print for machine use only")
 
     args = parser.parse_args()
+
+    # Make data saving directory if gathering experience hidden states
+    if args.gather:
+        DATA_DIR_NESTED = os.path.join('data',args.data_dir)
+        if not os.path.isdir(DATA_DIR_NESTED):
+            os.mkdir(DATA_DIR_NESTED)
 
     main(args)

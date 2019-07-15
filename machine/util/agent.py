@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from random import Random
 
 import torch
+import logging
 
 import babyai
 from machine.util import RLCheckpoint
@@ -34,7 +35,7 @@ class Agent(ABC):
 class ModelAgent(Agent):
     """A model-based agent. This agent behaves using a model."""
 
-    def __init__(self, model_or_name, obss_preprocessor, argmax, partial=False, diag_targets=None):
+    def __init__(self, model_or_name, obss_preprocessor, argmax, partial=False, diag_targets=None,drop_diag=False):
         self.partial = partial
         if obss_preprocessor is None:
             assert isinstance(model_or_name, str)
@@ -42,7 +43,7 @@ class ModelAgent(Agent):
         self.obss_preprocessor = obss_preprocessor
         if isinstance(model_or_name, str):
             if self.partial:
-                self.model = RLCheckpoint.load_partial_model(model_or_name, diag_targets=diag_targets)
+                self.model = RLCheckpoint.load_partial_model(model_or_name, diag_targets=diag_targets,drop_diag=drop_diag)
             else:
                 self.model = RLCheckpoint.load_model(model_or_name)
             if torch.cuda.is_available():
@@ -111,8 +112,18 @@ class RandomAgent:
                 'value': None}
 
 
-def load_agent(env, model_name, argmax=True, env_name=None, vocab=None, partial=False, diag_targets=None):
+def load_agent(env, model_name, argmax=True, env_name=None, vocab=None, partial=False, diag_targets=None,drop_diag=False):
     # env_name needs to be specified for demo agents
     obss_preprocessor = babyai.utils.ObssPreprocessor(
-        model_name, env.observation_space, load_vocab_from=vocab)
-    return ModelAgent(model_name, obss_preprocessor, argmax, partial=partial, diag_targets=diag_targets)
+        model_name,
+        env.observation_space,
+        load_vocab_from=vocab
+    )
+    return ModelAgent(
+        model_name,
+        obss_preprocessor,
+        argmax,
+        partial=partial,
+        diag_targets=diag_targets,
+        drop_diag=drop_diag
+    )
