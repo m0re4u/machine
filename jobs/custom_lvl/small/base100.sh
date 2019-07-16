@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -p gpu_shared
-#SBATCH -t 20:00:00
+#SBATCH -t 23:59:59
 #SBATCH --mem=12GB
 
 #SBATCH --mail-type=END
