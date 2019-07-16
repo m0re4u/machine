@@ -199,7 +199,7 @@ class RLCheckpoint(BaseCheckpoint):
         logger.warn(f"Loading partial RLCheckpoint from {path}")
         state = torch.load(path, map_location=torch.device('cpu'))
         if diag_targets is not None:
-            if drop_diag:
+            if drop_diag and 'reasoning.0.weight' in state['model']:
                 # Drop diagnostic weights
                 logger.warn("Dropped diagnostic classifier weights")
                 del state['model']['reasoning.0.weight']
