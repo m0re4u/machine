@@ -25,6 +25,6 @@ python3 train_rl.py \
     --reason_coef 2 \
     --drop_diag \
     --diag_targets 21 \
-    --load_checkpoint models/BabyAI-CustomGoToObjSmall-v0-_PPO_IAC_expert_filmcnn_gru_mem_seed1_job2651250_19-07-12-19-48-41/010000_check.pt \
+    --load_checkpoint models/BabyAI-CustomGoToObjSmall-v0-_PPO_IAC_expert_filmcnn_gru_mem_seed1_job2651250_19-07-12-19-48-41/010800_check.pt \
     --resume
 
