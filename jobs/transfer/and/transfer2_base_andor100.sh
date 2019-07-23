@@ -16,11 +16,11 @@ pushd ${HOME}/machine/
 
 # Run training
 python3 train_rl.py \
-    --env-name BabyAI-TransferGoToObjAndOr1-v0 \
+    --env-name BabyAI-TransferGoToObjAndOr2-v0 \
     --print_every 1 \
     --slurm_id $SLURM_JOB_ID \
     --tb \
     --seed 1 \
-    --load_checkpoint models/BabyAI-CustomGoToObjAndOr-v0-_PPO_AC_expert_filmcnn_gru_mem_seed100_job2607636_19-06-27-11-22-33/006800_check.pt \
+    --load_checkpoint models/BabyAI-CustomGoToObjAnd-v0-_PPO_AC_expert_filmcnn_gru_mem_seed100_job2709218_19-07-22-11-35-58/010000_check.pt \
     --resume
 

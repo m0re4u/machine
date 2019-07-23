@@ -21,6 +21,6 @@ python3 train_rl.py \
     --slurm_id $SLURM_JOB_ID \
     --tb \
     --seed 1 \
-    --load_checkpoint models/BabyAI-CustomGoToObjAndOr-v0-_PPO_AC_expert_filmcnn_gru_mem_seed42_job2607635_19-06-27-11-22-26/006900_check.pt \
+    --load_checkpoint models/BabyAI-CustomGoToObjAnd-v0-_PPO_AC_expert_filmcnn_gru_mem_seed1_job2709216_19-07-22-11-35-58/010000_check.pt \
     --resume
 

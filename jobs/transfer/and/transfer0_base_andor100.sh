@@ -21,9 +21,6 @@ python3 train_rl.py \
     --slurm_id $SLURM_JOB_ID \
     --tb \
     --seed 1 \
-    --reasoning \
-    --reason_coef 2 \
-    --diag_targets 21 \
-    --load_checkpoint models/BabyAI-CustomGoToObjAndOr-v0-_PPO_IAC_expert_filmcnn_gru_mem_seed42_job2607672_19-06-27-11-36-38/005400_check.pt \
+    --load_checkpoint models/BabyAI-CustomGoToObjAnd-v0-_PPO_AC_expert_filmcnn_gru_mem_seed100_job2709218_19-07-22-11-35-58/010000_check.pt \
     --resume
 
