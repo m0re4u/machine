@@ -16,7 +16,7 @@ pushd ${HOME}/machine/
 
 # Run training
 python3 train_rl.py \
-    --env-name BabyAI-TransferGoToObjAndOr1-v0 \
+    --env-name BabyAI-TransferGoToObjAnd1-v0 \
     --print_every 1 \
     --slurm_id $SLURM_JOB_ID \
     --tb \
