@@ -74,7 +74,7 @@ def main(args):
     episode_terminations = defaultdict(lambda: 0)
     num_episodes = 0
     N_TARGETS = 18 if args.diag_targets is None else args.diag_targets
-    num_frames = np.zeros(N_TARGETS)
+    num_frames = np.zeros((N_TARGETS, N_TARGETS))
     correct_frames = 0
     episode_data = reset_episode_data()
     episode_lengths = []
@@ -108,7 +108,7 @@ def main(args):
             correct = torch.sum(torch.as_tensor(episode_data['prediction']).to(device).type(torch.int32) == target.to(device).flatten())
             correct_frames += correct.item()
             for i, pred in enumerate(episode_data['prediction']):
-                num_frames[target[i].item()] += 1
+                num_frames[target[i].item()][pred] += 1
                 if not args.machine:
                     print(f"Reason: {pred:2} - True: {target[i].item():2}")
 
@@ -161,9 +161,11 @@ def main(args):
                 Failure rate:           {episode_terminations['task_failure']}\n\
                 Timeout rate:           {episode_terminations['timeout']}\n\
                 Frames observed:        {np.sum(num_frames)}")
+        print("PREDICTIONS -->")
         for i in range(N_TARGETS):
-            print(f"\
-                Frames for reason {i:2}: {num_frames[i]:2.0f}")
+            for j in range(N_TARGETS):
+                print(f"{num_frames[i][j]:2.0f} ", end='')
+            print("")
 
 
 if __name__ == "__main__":
