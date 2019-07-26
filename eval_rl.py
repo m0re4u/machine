@@ -161,11 +161,9 @@ def main(args):
                 Failure rate:           {episode_terminations['task_failure']}\n\
                 Timeout rate:           {episode_terminations['timeout']}\n\
                 Frames observed:        {np.sum(num_frames)}")
-        print("PREDICTIONS -->")
-        for i in range(N_TARGETS):
-            for j in range(N_TARGETS):
-                print(f"{num_frames[i][j]:2.0f} ", end='')
-            print("")
+    if args.confusion is not None:
+        np.savetxt(f"confusion_{args.confusion}.log", num_frames, fmt='%3.0f')
+
 
 
 if __name__ == "__main__":
@@ -196,6 +194,8 @@ if __name__ == "__main__":
                         help="Reasoning to ask the agent for")
     parser.add_argument("--machine", default=False, action='store_true',
                         help="print for machine use only")
+    parser.add_argument("--confusion", default=None, type=str,
+                        help="Print the diagnostic classification confusion matrix for analysis to this file, None if disabled")
 
     args = parser.parse_args()
 
