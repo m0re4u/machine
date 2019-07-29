@@ -11,13 +11,13 @@ import argparse
 import gym
 import torch
 import numpy as np
-
 import machine.util
 
 from collections import defaultdict
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+CONFUSION_DIR = 'confusions'
 
 def reset_episode_data():
     episode_data = {
@@ -162,7 +162,7 @@ def main(args):
                 Timeout rate:           {episode_terminations['timeout']}\n\
                 Frames observed:        {np.sum(num_frames)}")
     if args.confusion is not None:
-        np.savetxt(f"confusion_{args.confusion}.log", num_frames, fmt='%3.0f')
+        np.savetxt(f"{CONFUSION_DIR}/confusion_{args.confusion}.log", num_frames, fmt='%3.0f')
 
 
 
@@ -204,5 +204,8 @@ if __name__ == "__main__":
         DATA_DIR_NESTED = os.path.join('data',args.data_dir)
         if not os.path.isdir(DATA_DIR_NESTED):
             os.mkdir(DATA_DIR_NESTED)
+    if args.confusion is not None:
+        if not os.path.isdir(CONFUSION_DIR):
+            os.mkdir(CONFUSION_DIR)
 
     main(args)
