@@ -36,6 +36,9 @@ def main(args):
     torch.cuda.manual_seed_all(args.seed)
     np.random.seed(args.seed)
     env.seed(args.seed)
+    for _ in range(args.shift):
+        env.reset()
+
 
     # Define agent
     partial = (args.reasoning == 'diagnostic' or args.reasoning == 'model')
@@ -82,6 +85,8 @@ def main(args):
 
     while True:
         time.sleep(args.pause)
+        if args.show_gui:
+            renderer = env.render("human")
 
         # Act with agent
         result = agent.act(obs)
@@ -194,6 +199,10 @@ if __name__ == "__main__":
                         help="Reasoning to ask the agent for")
     parser.add_argument("--machine", default=False, action='store_true',
                         help="print for machine use only")
+    parser.add_argument("--show_gui", default=False, action='store_true',
+                        help="Show a gui for human interpretation of agent actions")
+    parser.add_argument("--shift", default=0, type=int,
+                        help="Shift N episodes forward")
     parser.add_argument("--confusion", default=None, type=str,
                         help="Print the diagnostic classification confusion matrix for analysis to this file, None if disabled")
 
