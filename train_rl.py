@@ -200,6 +200,8 @@ def init_argparser():
                         help='Drop weights of diagnostic classifier if we resume training')
     parser.add_argument('--detach_hidden', default=False, action='store_true',
                         help='Detach hidden state from rest of the network')
+    parser.add_argument('--sparse_diag', default=False, action='store_true',
+                        help='Only do sparse diagnostic training')
     parser.add_argument('--reason_coef', type=float, default=0.1,
                         help='Multiply the reasoning loss with this value')
     parser.add_argument('--delay_reason', type=int, default=0,

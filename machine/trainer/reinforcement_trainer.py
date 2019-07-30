@@ -59,6 +59,7 @@ class ReinforcementTrainer(object):
         self.reasoning = reasoning
         if self.reasoning:
             self.delay_reason = opt.delay_reason
+            self.sparse_reason = opt.sparse_diag
             self.reason_coef = opt.reason_coef
             self.reason_criterion = torch.nn.CrossEntropyLoss()
             self.num_subtasks = 2
@@ -171,6 +172,7 @@ class ReinforcementTrainer(object):
         for e_i in range(self.epochs):
             self.callback.on_epoch_begin(e_i)
 
+            ask_reason = numpy.random.randint(0,self.recurrence)
             for inds in self._get_batches_starting_indexes():
                 batch_logs = self.callback.on_batch_begin(None)
                 batch_loss = 0
@@ -221,7 +223,8 @@ class ReinforcementTrainer(object):
                         loss = policy_loss - self.entropy_coef * \
                             entropy + (self.value_loss_coef *
                                        (value_loss * disrupt_val))
-                    elif self.reasoning and self.callback.cycle > self.delay_reason:
+                    elif self.reasoning and self.callback.cycle > self.delay_reason and ((not self.sparse_reason) or ask_reason == i):
+                        print("REASONING LOSS ACTIVE")
                         a = sb.reasons.type(torch.long).to(device)
                         zero_mask = (a >= 0).type(torch.long)
                         val, idx = model_results['reason'].max(dim=1)
@@ -253,7 +256,7 @@ class ReinforcementTrainer(object):
                     batch_logs['policy_loss'] += policy_loss.item()
                     batch_logs['value_loss'] += value_loss.item()
                     batch_logs['disrupt'] += disrupt_val.item()
-                    if self.reasoning and self.callback.cycle > self.delay_reason:
+                    if self.reasoning and self.callback.cycle > self.delay_reason and ((not self.sparse_reason) or ask_reason == i):
                         batch_logs['reason_loss'] += reason_loss.item()
 
 
