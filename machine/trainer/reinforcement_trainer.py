@@ -224,7 +224,6 @@ class ReinforcementTrainer(object):
                             entropy + (self.value_loss_coef *
                                        (value_loss * disrupt_val))
                     elif self.reasoning and self.callback.cycle > self.delay_reason and ((not self.sparse_reason) or ask_reason == i):
-                        print("REASONING LOSS ACTIVE")
                         a = sb.reasons.type(torch.long).to(device)
                         zero_mask = (a >= 0).type(torch.long)
                         val, idx = model_results['reason'].max(dim=1)

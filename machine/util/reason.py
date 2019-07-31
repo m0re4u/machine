@@ -121,8 +121,10 @@ class ReasonLabeler():
         else:
             res = -1
         split_instr = mission.split('then')
-        map_ent = re.sub(self.replace_instr, "", split_instr[res]).strip()
-        label = self.mapping[map_ent]
+        map_ent = re.sub(self.replace_instr, "", split_instr[res])
+        map_ent = re.sub("twice", "", map_ent)
+        map_ent = re.sub("thrice", "", map_ent)
+        label = self.mapping[map_ent.strip()]
         return label
 
     def get_after_label(self, status, mission):
@@ -137,6 +139,8 @@ class ReasonLabeler():
         else:
             res = -1
         split_instr = mission.split('after')
-        map_ent = re.sub(self.replace_instr, "", split_instr[res]).strip()
-        label = self.mapping[map_ent]
+        map_ent = re.sub(self.replace_instr, "", split_instr[res])
+        map_ent = re.sub("twice", "", map_ent)
+        map_ent = re.sub("thrice", "", map_ent)
+        label = self.mapping[map_ent.strip()]
         return label

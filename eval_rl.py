@@ -19,6 +19,16 @@ from collections import defaultdict
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CONFUSION_DIR = 'confusions'
 
+action_map = {
+    "LEFT": "left",
+    "RIGHT": "right",
+    "UP": "forward",
+    "PAGE_UP": "pickup",
+    "PAGE_DOWN": "drop",
+    "SPACE": "toggle"
+}
+
+
 def reset_episode_data():
     episode_data = {
         'obs': [],
@@ -28,7 +38,34 @@ def reset_episode_data():
     }
     return episode_data
 
+
+def keyDownCb(keyName):
+    global obs
+    global agent
+    global env
+    # Avoiding processing of observation by agent for wrong key clicks
+    if keyName not in action_map and keyName != "RETURN":
+        return
+
+    agent_action = agent.act(obs)['action']
+
+    if keyName in action_map:
+        action = env.actions[action_map[keyName]]
+
+    elif keyName == "RETURN":
+        action = agent_action
+
+    obs, reward, done, _ = env.step(action)
+    agent.analyze_feedback(reward, done)
+    if done:
+        print("Reward:", reward)
+        obs, info = env.reset()
+        print(obs)
+        print("Mission: {}".format(obs["mission"]))
+
+
 def main(args):
+    global env
     env = gym.make(args.env)
 
     # Set seed for all randomness sources
@@ -39,8 +76,8 @@ def main(args):
     for _ in range(args.shift):
         env.reset()
 
-
     # Define agent
+    global agent
     partial = (args.reasoning == 'diagnostic' or args.reasoning == 'model')
     agent = machine.util.load_agent(
         env,
@@ -60,8 +97,7 @@ def main(args):
         transfer_type = int(args.env.split("-")[1][-1])
     else:
         transfer_type = None
-    reason_labeler = machine.util.ReasonLabeler(1,2, tt=transfer_type, replace_instr=replace_instruction)
-
+    reason_labeler = machine.util.ReasonLabeler(1, 2, tt=transfer_type, replace_instr=replace_instruction)
 
     # Freeze layers and optionally load diagnostic model
     for name, param in agent.model.named_parameters():
@@ -73,6 +109,7 @@ def main(args):
             state = torch.load(args.diag_model, map_location='cpu')
             param.data.copy_(state[name.partition('.')[2]])
 
+    global obs
     obs, info = env.reset()
     episode_terminations = defaultdict(lambda: 0)
     num_episodes = 0
@@ -88,76 +125,85 @@ def main(args):
         if args.show_gui:
             renderer = env.render("human")
 
-        # Act with agent
-        result = agent.act(obs)
+        if args.manual_mode and renderer.window is not None:
+            renderer.window.setKeyDownCb(keyDownCb)
+        else:
 
-        # Update the environment
-        obs, reward, done, info = env.step(result['action'])
-        ep_l += 1
-        agent.memory *= (1 - done)
+            # Act with agent
+            result = agent.act(obs)
 
-        # Save data for a frame in episode
-        episode_data['obs'].append(obs)
-        episode_data['status'].append(reason_labeler.annotate_status([obs], [info]))
+            # Update the environment
+            obs, reward, done, info = env.step(result['action'])
+            ep_l += 1
+            agent.memory *= (1 - done)
 
-        if args.gather:
-            episode_data['embeddings'].append(agent.model.embedding.view(-1).cpu().numpy())
-        _, pred_idx = result['reason'].max(1)
-        episode_data['prediction'].append(pred_idx.item())
+            # Save data for a frame in episode
+            episode_data['obs'].append(obs)
+            episode_data['status'].append(reason_labeler.annotate_status([obs], [info]))
 
-        if done:
-            # Upon episode completion, get target reason
-            target = reason_labeler.compute_reasons(
-                torch.stack(episode_data['status']), episode_data['obs'])
-
-            correct = torch.sum(torch.as_tensor(episode_data['prediction']).to(device).type(torch.int32) == target.to(device).flatten())
-            correct_frames += correct.item()
-            for i, pred in enumerate(episode_data['prediction']):
-                num_frames[target[i].item()][pred] += 1
-                if not args.machine:
-                    print(f"Reason: {pred:2} - True: {target[i].item():2}")
-
-            # Save data if we're gathering experience
             if args.gather:
-                gather_data = np.array([episode_data['embeddings'], target.cpu().numpy().flatten()])
-                np.save(f"data/{args.data_dir}/data_{num_episodes:03}", gather_data.T)
+                episode_data['embeddings'].append(agent.model.embedding.view(-1).cpu().numpy())
+            _, pred_idx = result['reason'].max(1)
+            episode_data['prediction'].append(pred_idx.item())
 
-            # Check termination of episode
-            if all([x == 'success' for x in info['status']]):
-                # All objectives completed
-                episode_terminations['success'] += 1
-            elif any([x == 'success' for x in info['status']]) and 'or' in obs['mission'] and ep_l < env.max_steps:
-                # one objective completed in "or" mission
-                episode_terminations['success'] += 1
-            elif reward == 0:
-                # not completed, record why not
-                if 'no_reward_reason' in info:
-                    episode_terminations['task_failure'] += 1
+            if done:
+                # Upon episode completion, get target reason
+                target = reason_labeler.compute_reasons(
+                    torch.stack(episode_data['status']), episode_data['obs'])
+
+                correct = torch.sum(torch.as_tensor(episode_data['prediction']).to(
+                    device).type(torch.int32) == target.to(device).flatten())
+                correct_frames += correct.item()
+                for i, pred in enumerate(episode_data['prediction']):
+                    num_frames[target[i].item()][pred] += 1
+                    if not args.machine:
+                        print(f"Reason: {pred:2} - True: {target[i].item():2}")
+
+                # Save data if we're gathering experience
+                if args.gather:
+                    gather_data = np.array(
+                        [episode_data['embeddings'], target.cpu().numpy().flatten()])
+                    np.save(
+                        f"data/{args.data_dir}/data_{num_episodes:03}", gather_data.T)
+
+                # Check termination of episode
+                if all([x == 'success' for x in info['status']]):
+                    # All objectives completed
+                    episode_terminations['success'] += 1
+                elif any([x == 'success' for x in info['status']]) and 'or' in obs['mission'] and ep_l < env.max_steps:
+                    # one objective completed in "or" mission
+                    episode_terminations['success'] += 1
+                elif reward == 0:
+                    # not completed, record why not
+                    if 'no_reward_reason' in info:
+                        episode_terminations['task_failure'] += 1
+                    else:
+                        episode_terminations['timeout'] += 1
+
+                num_episodes += 1
+                episode_lengths.append(ep_l)
+                ep_l = 0
+                if not args.machine:
+                    print(f"Completed mission {num_episodes:3}: {obs['mission']:50} - reward: {reward}")
+                obs, info = env.reset()
+                episode_data = reset_episode_data()
+
+                if num_episodes > args.episodes:
+                    break
                 else:
-                    episode_terminations['timeout'] += 1
-
-            num_episodes += 1
-            episode_lengths.append(ep_l)
-            ep_l = 0
-            if not args.machine:
-                print(f"Completed mission {num_episodes:3}: {obs['mission']:50} - reward: {reward}")
-            obs, info = env.reset()
-            episode_data = reset_episode_data()
-
-            if num_episodes > args.episodes:
-                break
-            else:
-                continue
+                    continue
 
     for k, v in episode_terminations.items():
-        episode_terminations[k]= v / num_episodes
+        episode_terminations[k] = v / num_episodes
 
-    np.testing.assert_almost_equal(sum(episode_terminations.values()), 1, decimal=7, err_msg=f"-- {episode_terminations.values()}", verbose=True)
+    np.testing.assert_almost_equal(sum(episode_terminations.values(
+    )), 1, decimal=7, err_msg=f"-- {episode_terminations.values()}", verbose=True)
 
     # Print results
     if args.machine:
-        #frames,acc,eplen,succ,fail,time
-        print(f" {np.sum(num_frames)},{correct_frames / np.sum(num_frames)},{np.average(episode_lengths)},{episode_terminations['success']},{episode_terminations['task_failure']},{episode_terminations['timeout']}")
+        # frames,acc,eplen,succ,fail,time
+        print(
+            f" {np.sum(num_frames)},{correct_frames / np.sum(num_frames)},{np.average(episode_lengths)},{episode_terminations['success']},{episode_terminations['task_failure']},{episode_terminations['timeout']}")
     else:
         print(f"\n\
                 Reason accuracy:        {correct_frames / np.sum(num_frames)}\n\
@@ -170,7 +216,6 @@ def main(args):
         np.savetxt(f"{CONFUSION_DIR}/confusion_{args.confusion}.log", num_frames, fmt='%3.0f')
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", required=True,
@@ -179,7 +224,7 @@ if __name__ == "__main__":
                         help="name of the trained ACModel (REQUIRED)")
     parser.add_argument("--diag_model", default=None,
                         help="name of the trained diagnostic classifier")
-    parser.add_argument("--diag_targets", default=None,type=int,
+    parser.add_argument("--diag_targets", default=None, type=int,
                         help="Number of outputs for diagnostic classifier")
     parser.add_argument("--drop_diag", default=False, action='store_true',
                         help="ignore loading of weights for diagnostic classifier")
@@ -205,12 +250,14 @@ if __name__ == "__main__":
                         help="Shift N episodes forward")
     parser.add_argument("--confusion", default=None, type=str,
                         help="Print the diagnostic classification confusion matrix for analysis to this file, None if disabled")
+    parser.add_argument("--manual_mode", action="store_true", default=False,
+                        help="Allows you to take control of the agent at any point of time")
 
     args = parser.parse_args()
 
     # Make data saving directory if gathering experience hidden states
     if args.gather:
-        DATA_DIR_NESTED = os.path.join('data',args.data_dir)
+        DATA_DIR_NESTED = os.path.join('data', args.data_dir)
         if not os.path.isdir(DATA_DIR_NESTED):
             os.mkdir(DATA_DIR_NESTED)
     if args.confusion is not None:

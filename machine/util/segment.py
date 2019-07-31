@@ -46,7 +46,9 @@ words_to_wordtype = {
     'then': SegmentType.PROP,
     'and': SegmentType.PROP,
     'or': SegmentType.PROP,
-    'after': SegmentType.PROP
+    'after': SegmentType.PROP,
+    'twice': SegmentType.PROP,
+    'thrice': SegmentType.PROP
 }
 
 colors = set([
