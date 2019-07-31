@@ -68,7 +68,7 @@ class ReinforcementTrainer(object):
                 self.num_subtasks = 2
 
             if "GoTo" in opt.env_name:
-                replace_instruction = r"go to the"
+                replace_instruction = r"go to (the|a)"
             elif "Pickup" in opt.env_name:
                 replace_instruction = r"pick up (the|a)"
             if "Transfer" in opt.env_name:
