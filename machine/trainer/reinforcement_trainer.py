@@ -62,7 +62,11 @@ class ReinforcementTrainer(object):
             self.sparse_reason = opt.sparse_diag
             self.reason_coef = opt.reason_coef
             self.reason_criterion = torch.nn.CrossEntropyLoss()
-            self.num_subtasks = 2
+            if "GoToObjThrees" in opt.env_name:
+                self.num_subtasks = 3
+            else:
+                self.num_subtasks = 2
+
             if "GoTo" in opt.env_name:
                 replace_instruction = r"go to the"
             elif "Pickup" in opt.env_name:

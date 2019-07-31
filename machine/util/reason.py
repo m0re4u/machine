@@ -57,19 +57,37 @@ class ReasonLabeler():
         num_procs = statuses.size()[1]
         x = torch.zeros(n_frames, num_procs, dtype=torch.int).to(device)
         self.latest_label = torch.ones(num_procs).fill_(-1).to(device)
-        for i in reversed(range(n_frames)):
-            prev_status = statuses[i-1, :, :] if i > 0 else self.last_status
-            for p, proc in enumerate(prev_status):
-                mission = obs[p]['mission']
-                # Create label based on mission type
-                if 'and' in mission:
-                    x[i, p] = self.get_and_label(statuses[i, p, :], prev_status[p, :].to(device), p, mission)
-                elif 'or' in mission:
-                    x[i, p] = self.get_or_label(statuses[i, p, :], prev_status[p, :].to(device), p, mission)
-                elif 'then' in mission:
-                    x[i, p] = self.get_then_label(statuses[i, p, :], mission)
-                elif 'after' in mission:
-                    x[i, p] = self.get_after_label(statuses[i, p, :], mission)
+        if self.num_subtasks == 2:
+            for i in reversed(range(n_frames)):
+                prev_status = statuses[i-1, :, :] if i > 0 else self.last_status
+                for p, proc in enumerate(prev_status):
+                    mission = obs[p]['mission']
+                    # Create label based on mission type
+                    if 'and' in mission:
+                        x[i, p] = self.get_and_label(statuses[i, p, :], prev_status[p, :].to(device), p, mission)
+                    elif 'or' in mission:
+                        x[i, p] = self.get_or_label(statuses[i, p, :], prev_status[p, :].to(device), p, mission)
+                    elif 'then' in mission:
+                        x[i, p] = self.get_then_label(statuses[i, p, :], mission)
+                    elif 'after' in mission:
+                        x[i, p] = self.get_after_label(statuses[i, p, :], mission)
+        elif self.num_subtasks == 3:
+            for i in reversed(range(n_frames)):
+                prev_status = statuses[i-1, :, :] if i > 0 else self.last_status
+                for p, proc in enumerate(prev_status):
+                    mission = obs[p]['mission']
+                    # Create label based on mission type
+                    if mission.count('then') == 2:
+                        order = [0,1,2]
+                    elif mission.count('after') == 2:
+                        order = [2,1,0]
+                    elif mission.index('then') > mission.index('after'):
+                        order = [1,0,2]
+                    elif mission.index('then') < mission.index('after'):
+                        order = [2,0,1]
+                    else:
+                        print("SOMETHING IS FUCKY, IS YOUR MISSION ALRIGHT?")
+                    x[i, p] = self.get_ordered_label(statuses[i, p, :], mission, order=order)
 
         # x should be n_frames by num_procs with either label of segment the
         # agent should predict or the object mapping
@@ -142,5 +160,15 @@ class ReasonLabeler():
         map_ent = re.sub(self.replace_instr, "", split_instr[res])
         map_ent = re.sub("twice", "", map_ent)
         map_ent = re.sub("thrice", "", map_ent)
+        label = self.mapping[map_ent.strip()]
+        return label
+
+    def get_ordered_label(self, status, mission, order):
+        # First occurrence of a zero in status is the current target
+        res = next((i for i, x in enumerate(status) if not x), -1)
+        split_instr = re.split(r"(after|then)", mission)
+        split_instr = [x for x in split_instr if x != 'then']
+        split_instr = [x for x in split_instr if x != 'after']
+        map_ent = re.sub(self.replace_instr, "", split_instr[order[res]])
         label = self.mapping[map_ent.strip()]
         return label

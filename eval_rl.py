@@ -60,7 +60,6 @@ def keyDownCb(keyName):
     if done:
         print("Reward:", reward)
         obs, info = env.reset()
-        print(obs)
         print("Mission: {}".format(obs["mission"]))
 
 
@@ -97,7 +96,12 @@ def main(args):
         transfer_type = int(args.env.split("-")[1][-1])
     else:
         transfer_type = None
-    reason_labeler = machine.util.ReasonLabeler(1, 2, tt=transfer_type, replace_instr=replace_instruction)
+    if "GoToObjThrees" in args.env:
+        n_subtasks = 3
+    else:
+        n_subtasks = 2
+
+    reason_labeler = machine.util.ReasonLabeler(1, n_subtasks, tt=transfer_type, replace_instr=replace_instruction)
 
     # Freeze layers and optionally load diagnostic model
     for name, param in agent.model.named_parameters():
