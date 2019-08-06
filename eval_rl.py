@@ -89,7 +89,7 @@ def main(args):
 
     # One process, two subtasks per process
     if "GoTo" in args.env:
-        replace_instruction = r"go to the"
+        replace_instruction = r"go to (the|a)"
     elif "Pickup" in args.env:
         replace_instruction = r"pick up (the|a)"
     if "Transfer" in args.env:
