@@ -23,5 +23,7 @@ python3 train_rl.py \
     --seed 42 \
     --reasoning \
     --reason_coef 2 \
-    --delay_reason 2000
+    --delay_reason 2000 \
+    --save_every 300
+
 
