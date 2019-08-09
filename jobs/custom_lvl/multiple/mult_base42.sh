@@ -20,4 +20,6 @@ python3 train_rl.py \
     --print_every 1 \
     --slurm_id $SLURM_JOB_ID \
     --tb \
-    --seed 42
+    --seed 42 \
+    --save_every 300
+
