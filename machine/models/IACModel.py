@@ -54,10 +54,15 @@ class IACModel(ACModel):
         x = torch.transpose(torch.transpose(obs.image, 1, 3), 2, 3)
 
         if self.arch.startswith("expert_filmcnn"):
+            print(x.size())
             x = self.image_conv(x)
             for controler in self.controllers:
                 x = controler(x, instr_embedding)
+                print(x.size())
             x = F.relu(self.film_pool(x))
+            print(x.size())
+            print("stop")
+
         else:
             x = self.image_conv(x)
 

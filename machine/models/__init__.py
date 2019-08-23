@@ -10,3 +10,4 @@ from .SoftmaxPolicy import SoftmaxPolicy, PolicyMapping
 from .SigmoidTermination import SigmoidTermination
 from .EmbeddingModel import SkillEmbedding
 from .IACModel import IACModel
+from .MinModel import MinModel

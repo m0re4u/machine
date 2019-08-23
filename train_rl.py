@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 import machine
-from machine.models import ACModel, IACModel, SkillEmbedding
+from machine.models import ACModel, IACModel, MinModel
 from machine.trainer import ReinforcementTrainer
 from machine.util import ObssPreprocessor
 
@@ -49,59 +49,37 @@ def train_model():
 
     def reshape_reward(_0, _1, reward, _2): return opt.reward_scale * reward
 
-    # Prepare agent model. If option critic, make as many as there are options
-    if opt.oc:
-        algo = 'ppoc'
-        args = [obss_preprocessor.obs_space, envs[0].action_space, opt.image_dim, opt.memory_dim,
-                opt.instr_dim, not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch]
-        model = [ACModel(*args) for _ in range(opt.n_options)]
-        if torch.cuda.is_available():
-            for m in model:
-                m.cuda()
-    elif opt.reasoning:
-        algo = 'ppo'
-        if opt.resume:
+    algo = 'ppo'
+    if opt.resume:
+        if opt.reasoning:
             if opt.diag_targets == 18:
                 model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint)
             else:
                 model = machine.util.RLCheckpoint.load_partial_model(opt.load_checkpoint, diag_targets=opt.diag_targets, drop_diag=opt.drop_diag)
             model.detach = opt.detach_hidden
         else:
-            if not opt.detach_hidden:
-                model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                                        opt.image_dim, opt.memory_dim, opt.instr_dim,
-                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch, opt.diag_targets)
+            model = machine.util.RLCheckpoint.load_model(opt.load_checkpoint)
+            model.train()
+    else:
+        if opt.reasoning:
+            if opt.min_model:
+                model = MinModel(obss_preprocessor.obs_space, envs[0].action_space, opt.image_dim, opt.memory_dim, opt.instr_dim)
             else:
                 model = IACModel(obss_preprocessor.obs_space, envs[0].action_space,
                                         opt.image_dim, opt.memory_dim, opt.instr_dim,
-                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch, opt.diag_targets, detach=True)
-        if torch.cuda.is_available():
-            model.cuda()
-        model.train()
-    elif opt.resume and (not opt.oc):
-        algo = 'ppo'
-        model = machine.util.RLCheckpoint.load_model(opt.load_checkpoint)
-        if torch.cuda.is_available():
-            model.cuda()
-        model.train()
-    elif opt.se:
-        algo = 'ppo'
-        model = SkillEmbedding(obss_preprocessor.obs_space['image'],
-                               envs[0].action_space, opt.n_skills, obss_preprocessor.vocab,
-                               opt.image_dim, opt.memory_dim, not opt.no_mem, opt.mapping,
-                               opt.num_processes, opt.trunk_arch)
-        if torch.cuda.is_available():
-            model.cuda()
-    else:
-        algo = 'ppo'
-        model = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
-                        opt.image_dim, opt.memory_dim, opt.instr_dim,
-                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
-        if torch.cuda.is_available():
-            model.cuda()
+                                        not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch,
+                                        opt.diag_targets, detach=opt.detach_hidden)
 
-    trainer = ReinforcementTrainer(
-        p_envs, opt, model, model_name, obss_preprocessor, reshape_reward, algo, opt.reasoning)
+        else:
+            model = ACModel(obss_preprocessor.obs_space, envs[0].action_space,
+                            opt.image_dim, opt.memory_dim, opt.instr_dim,
+                            not opt.no_instr, opt.instr_arch, not opt.no_mem, opt.arch)
+    model.train()
+    if torch.cuda.is_available():
+        model.cuda()
+
+    trainer = ReinforcementTrainer(p_envs, opt, model, model_name, obss_preprocessor, reshape_reward, algo, opt.reasoning)
+    print(model)
 
     # Start training
     trainer.train()
@@ -171,22 +149,6 @@ def init_argparser():
     parser.add_argument('--ppo-epochs', type=int, default=4,
                         help='Number of epochs (default: 4)')
 
-    # Option-Critic arguments
-    parser.add_argument('--oc', action='store_true',
-                        help='Enable option-critic version of ppo')
-    parser.add_argument('--n_options', type=int, default=1,
-                        help='How many options to consider')
-
-    # Skill embedding arguments
-    parser.add_argument('--se', action='store_true',
-                        help='Enable skill embeddings')
-    parser.add_argument('--n_skills', type=int, default=6,
-                        help='How many skills to consider')
-    parser.add_argument('--mapping', type=str, default='color', choices=['color', 'object', 'command', 'random', 'constant'],
-                        help='What mapping to use to select the skill trunks')
-    parser.add_argument('--trunk_arch', type=str, default='fcn', choices=['fcn', 'cnn'],
-                        help='Skill trunk architecture')
-
     # Segmentation arguments
     parser.add_argument('--segment_level', type=str, default='word', choices=['word', 'segment', 'word_annotated'],
                         help='Segmentation level')
@@ -223,6 +185,7 @@ def init_argparser():
                         help="don't use memory in the model")
     parser.add_argument("--arch", default='expert_filmcnn',
                         help="image embedding architecture")
+    parser.add_argument("--min_model", action='store_true', default=False, help="Try a minimal model")
 
     # Logging and model saving
     parser.add_argument('--tb',
@@ -264,14 +227,6 @@ def validate_options(parser, opt):
     else:
         logging.info("CUDA is not available")
 
-    # Option-Critic and SkillEmbedding are mutually exclusive
-    if opt.se:
-        assert not opt.oc
-    if opt.oc:
-        logging.error("OPTION-CRITIC IS UNFINISHED AND SHOULD NOT BE USED")
-        assert not opt.se
-        exit(1)
-
     # Loading in of pretrained model
     if opt.resume and opt.load_checkpoint:
         checkpoint = Path(opt.load_checkpoint)
@@ -291,13 +246,6 @@ def validate_options(parser, opt):
     config = vars(opt)
     logging.info("Parameters:")
 
-    # Ignore settings for Option-Critic or SkillEmbedding if they're not enabled
-    if not config['oc']:
-        config.pop('n_options')
-    if not config['se']:
-        config.pop('n_skills')
-        config.pop('mapping')
-        config.pop('trunk_arch')
     if not config['resume']:
         config.pop('load_checkpoint')
 
@@ -316,7 +264,7 @@ def get_model_name(opt):
     suffix = datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")
     instr = opt.instr_arch if opt.instr_arch else "noinstr"
     mem = "mem" if not opt.no_mem else "nomem"
-    alg = "PPO" if not opt.oc else "PPOC"
+    alg = "PPO"
     jobid = f'_job{opt.slurm_id}' if opt.slurm_id != 0 else ''
     if opt.resume:
         checkpoint = Path(opt.load_checkpoint)
@@ -326,19 +274,8 @@ def get_model_name(opt):
     else:
         res = ""
 
-    if opt.se:
-        mod = "SE"
-        model_name_parts = {
-            'alg': alg,
-            'mod': mod,
-            'env': opt.env_name,
-            'res': res,
-            'mem': mem,
-            'seed': opt.seed,
-            'jobid': jobid,
-            'suffix': suffix
-        }
-        return "{env}-{res}_{alg}_{mod}_{mem}_seed{seed}{jobid}_{suffix}".format(**model_name_parts)
+    if opt.min_model:
+        return f"{opt.env_name}_MinModel_seed{opt.seed}{jobid}_{suffix}"
     elif opt.reasoning:
         mod = "IAC"
         model_name_parts = {

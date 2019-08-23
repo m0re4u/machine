@@ -224,6 +224,7 @@ class ACModel(BaseModel):
 
         x = torch.transpose(torch.transpose(obs.image, 1, 3), 2, 3)
 
+        print(x.size())
         if self.arch.startswith("expert_filmcnn"):
             x = self.image_conv(x)
             for controler in self.controllers:
@@ -231,6 +232,7 @@ class ACModel(BaseModel):
             x = F.relu(self.film_pool(x))
         else:
             x = self.image_conv(x)
+        print(x.size())
 
         x = x.reshape(x.shape[0], -1)
 
