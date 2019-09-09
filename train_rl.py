@@ -79,7 +79,6 @@ def train_model():
         model.cuda()
 
     trainer = ReinforcementTrainer(p_envs, opt, model, model_name, obss_preprocessor, reshape_reward, algo, opt.reasoning)
-    print(model)
 
     # Start training
     trainer.train()
